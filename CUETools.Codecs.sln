@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28307.168
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CUETools.Codecs", "CUETools.Codecs\CUETools.Codecs.csproj", "{68BB5DE6-F3CA-4D5E-BF0E-51702063703A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CUETools.Codecs.FLAKE", "CUETools.Codecs.FLAKE\CUETools.Codecs.FLAKE.csproj", "{9250999F-E34C-45E5-B818-093AB0523C76}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{68BB5DE6-F3CA-4D5E-BF0E-51702063703A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{68BB5DE6-F3CA-4D5E-BF0E-51702063703A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{68BB5DE6-F3CA-4D5E-BF0E-51702063703A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{68BB5DE6-F3CA-4D5E-BF0E-51702063703A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9250999F-E34C-45E5-B818-093AB0523C76}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9250999F-E34C-45E5-B818-093AB0523C76}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9250999F-E34C-45E5-B818-093AB0523C76}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9250999F-E34C-45E5-B818-093AB0523C76}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {3CE4ACB5-1F86-42DF-B671-99478A4DF952}
+	EndGlobalSection
+EndGlobal
