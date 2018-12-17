@@ -2,8 +2,6 @@
 
 This is for encoding into FLAC.
 
-Source will be available when i get a chance to upload it.
-
 This has not been tested much yet, I just converted it to .net standard and left much of the original code intact
 
 
