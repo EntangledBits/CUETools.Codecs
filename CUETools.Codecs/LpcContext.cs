@@ -9,12 +9,12 @@ namespace CUETools.Codecs
     {
         public LpcContext()
         {
-            coefs = new int[lpc.MAX_LPC_ORDER];
-            reflection_coeffs = new double[lpc.MAX_LPC_ORDER];
-            prediction_error = new double[lpc.MAX_LPC_ORDER];
-            autocorr_values = new double[lpc.MAX_LPC_ORDER + 1];
-            best_orders = new int[lpc.MAX_LPC_ORDER];
-            done_lpcs = new uint[lpc.MAX_LPC_PRECISIONS];
+            coefs = new int[Lpc.MAX_LPC_ORDER];
+            Reflection = new double[Lpc.MAX_LPC_ORDER];
+            prediction_error = new double[Lpc.MAX_LPC_ORDER];
+            autocorr_values = new double[Lpc.MAX_LPC_ORDER + 1];
+            best_orders = new int[Lpc.MAX_LPC_ORDER];
+            done_lpcs = new uint[Lpc.MAX_LPC_PRECISIONS];
         }
 
         /// <summary>
@@ -23,7 +23,7 @@ namespace CUETools.Codecs
         public void Reset()
         {
             autocorr_order = 0;
-            for (int iPrecision = 0; iPrecision < lpc.MAX_LPC_PRECISIONS; iPrecision++)
+            for (int iPrecision = 0; iPrecision < Lpc.MAX_LPC_PRECISIONS; iPrecision++)
                 done_lpcs[iPrecision] = 0;
         }
 
@@ -40,10 +40,10 @@ namespace CUETools.Codecs
         {
             if (autocorr_order > order)
                 return;
-            fixed (double* reff = reflection_coeffs, autoc = autocorr_values, err = prediction_error)
+            fixed (double* reff = Reflection, autoc = autocorr_values, err = prediction_error)
             {
-                lpc.compute_autocorr(samples, blocksize, autocorr_order, order, autoc, window);
-                lpc.compute_schur_reflection(autoc, (uint)order, reff, err);
+                Lpc.Compute_autocorr(samples, blocksize, autocorr_order, order, autoc, window);
+                Lpc.Compute_schur_reflection(autoc, (uint)order, reff, err);
                 autocorr_order = order + 1;
             }
         }
@@ -52,34 +52,34 @@ namespace CUETools.Codecs
         {
             if (autocorr_order > order)
                 return;
-            fixed (double* reff = reflection_coeffs, autoc = autocorr_values, err = prediction_error)
+            fixed (double* reff = Reflection, autoc = autocorr_values, err = prediction_error)
             {
-                lpc.compute_autocorr(samples, blocksize, 0, order + 1, autoc, window);
+                Lpc.Compute_autocorr(samples, blocksize, 0, order + 1, autoc, window);
                 for (int i = 1; i <= order; i++)
                     autoc[i] = autoc[i + 1];
-                lpc.compute_schur_reflection(autoc, (uint)order, reff, err);
+                Lpc.Compute_schur_reflection(autoc, (uint)order, reff, err);
                 autocorr_order = order + 1;
             }
         }
 
         public void ComputeReflection(int order, float* autocorr)
         {
-            fixed (double* reff = reflection_coeffs, autoc = autocorr_values, err = prediction_error)
+            fixed (double* reff = Reflection, autoc = autocorr_values, err = prediction_error)
             {
                 for (int i = 0; i <= order; i++)
                     autoc[i] = autocorr[i];
-                lpc.compute_schur_reflection(autoc, (uint)order, reff, err);
+                Lpc.Compute_schur_reflection(autoc, (uint)order, reff, err);
                 autocorr_order = order + 1;
             }
         }
 
         public void ComputeReflection(int order, double* autocorr)
         {
-            fixed (double* reff = reflection_coeffs, autoc = autocorr_values, err = prediction_error)
+            fixed (double* reff = Reflection, autoc = autocorr_values, err = prediction_error)
             {
                 for (int i = 0; i <= order; i++)
                     autoc[i] = autocorr[i];
-                lpc.compute_schur_reflection(autoc, (uint)order, reff, err);
+                Lpc.Compute_schur_reflection(autoc, (uint)order, reff, err);
                 autocorr_order = order + 1;
             }
         }
@@ -118,25 +118,18 @@ namespace CUETools.Codecs
         /// <param name="lpcs">LPC coefficients buffer (for all orders)</param>
         public void ComputeLPC(float* lpcs)
         {
-            fixed (double* reff = reflection_coeffs)
-                lpc.compute_lpc_coefs((uint)autocorr_order - 1, reff, lpcs);
+            fixed (double* reff = Reflection)
+                Lpc.Compute_lpc_coefs((uint)autocorr_order - 1, reff, lpcs);
         }
 
         public double[] autocorr_values;
-        double[] reflection_coeffs;
         public double[] prediction_error;
         public int[] best_orders;
         public int[] coefs;
         int autocorr_order;
         public int shift;
 
-        public double[] Reflection
-        {
-            get
-            {
-                return reflection_coeffs;
-            }
-        }
+        public double[] Reflection { get; }
 
         public uint[] done_lpcs;
     }

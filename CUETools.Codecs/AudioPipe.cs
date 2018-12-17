@@ -6,16 +6,15 @@ namespace CUETools.Codecs
     public class AudioPipe : IAudioSource//, IDisposable
     {
         private AudioBuffer _readBuffer, _writeBuffer;
-        private AudioPCMConfig pcm;
-        private long _sampleLen, _samplePos;
-        private int _maxLength;
+        private long _samplePos;
+        private readonly int _maxLength;
         private Thread _workThread;
         private IAudioSource _source;
         private bool _close = false;
         private bool _haveData = false;
         private int _bufferPos = 0;
         private Exception _ex = null;
-        private bool own;
+        private readonly bool own;
         private ThreadPriority priority;
 
         public long Position
@@ -52,29 +51,17 @@ namespace CUETools.Codecs
             }
         }
 
-        public long Length
-        {
-            get
-            {
-                return _sampleLen;
-            }
-        }
+        public long Length { get; }
 
         public long Remaining
         {
             get
             {
-                return _sampleLen - _samplePos;
+                return Length - _samplePos;
             }
         }
 
-        public AudioPCMConfig PCM
-        {
-            get
-            {
-                return pcm;
-            }
-        }
+        public AudioPCMConfig PCM { get; }
 
         public string Path
         {
@@ -88,11 +75,11 @@ namespace CUETools.Codecs
 
         public AudioPipe(AudioPCMConfig pcm, int size)
         {
-            this.pcm = pcm;
+            this.PCM = pcm;
             _readBuffer = new AudioBuffer(pcm, size);
             _writeBuffer = new AudioBuffer(pcm, size);
             _maxLength = size;
-            _sampleLen = -1;
+            Length = -1;
             _samplePos = 0;
         }
 
@@ -102,7 +89,7 @@ namespace CUETools.Codecs
             this.own = own;
             this.priority = priority;
             _source = source;
-            _sampleLen = _source.Length;
+            Length = _source.Length;
             _samplePos = _source.Position;
         }
 
@@ -150,10 +137,12 @@ namespace CUETools.Codecs
         private void Go()
         {
             if (_workThread != null || _ex != null || _source == null) return;
-            _workThread = new Thread(Decompress);
-            _workThread.Priority = priority;
-            _workThread.IsBackground = true;
-            _workThread.Name = "AudioPipe";
+            _workThread = new Thread(Decompress)
+            {
+                Priority = priority,
+                IsBackground = true,
+                Name = "AudioPipe"
+            };
             _workThread.Start(null);
         }
 
@@ -195,7 +184,7 @@ namespace CUETools.Codecs
         {
             if (_writeBuffer.Size < _writeBuffer.Length + buff.Length)
             {
-                AudioBuffer realloced = new AudioBuffer(pcm, _writeBuffer.Size + buff.Size);
+                AudioBuffer realloced = new AudioBuffer(PCM, _writeBuffer.Size + buff.Size);
                 realloced.Prepare(_writeBuffer, 0, _writeBuffer.Length);
                 _writeBuffer = realloced;
             }

@@ -1,36 +1,12 @@
-/**
- * CUETools.Flake: pure managed FLAC audio encoder
- * Copyright (c) 2009 Gregory S. Chudov
- * Based on Flake encoder, http://flake-enc.sourceforge.net/
- * Copyright (c) 2006-2009 Justin Ruggles
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
- */
-
 using System;
-using System.Collections.Generic;
-using System.Text;
 using System.IO;
 
 namespace CUETools.Codecs.FLAKE
 {
-	[AudioDecoderClass("libFlake", "flac")]
+    [AudioDecoderClass("libFlake", "flac")]
 	public class FlakeReader: IAudioSource
 	{
-		int[] samplesBuffer;
-		int[] residualBuffer;
+        readonly int[] residualBuffer;
 
 		byte[] _framesBuffer;
 		int _framesBufferLength = 0, _framesBufferOffset = 0;
@@ -42,51 +18,29 @@ namespace CUETools.Codecs.FLAKE
 		Crc16 crc16;
 		FlacFrame frame;
 		BitReader framereader;
-		AudioPCMConfig pcm;
-
-		uint min_block_size = 0;
+        uint min_block_size = 0;
 		uint max_block_size = 0;
 		uint min_frame_size = 0;
 		uint max_frame_size = 0;
 
 		int _samplesInBuffer, _samplesBufferOffset;
-		long _sampleCount = 0, _sampleOffset = 0;
+		long _sampleOffset = 0;
+        Stream _IO;
 
-		bool do_crc = true;
+        public bool DoCRC { get; set; } = true;
 
-		string _path;
-		Stream _IO;
+        public int[] Samples { get; }
 
-		public bool DoCRC
+        public FlakeReader(string path, Stream IO)
 		{
-			get
-			{
-				return do_crc;
-			}
-			set
-			{
-				do_crc = value;
-			}
-		}
-
-		public int[] Samples
-		{
-			get
-			{
-				return samplesBuffer;
-			}
-		}
-
-		public FlakeReader(string path, Stream IO)
-		{
-			_path = path;
-			_IO = IO != null ? IO : new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 0x10000);
+			Path = path;
+			_IO = IO ?? new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 0x10000);
 
 			crc8 = new Crc8();
 			crc16 = new Crc16();
-			
+
 			_framesBuffer = new byte[0x20000];
-			decode_metadata();
+			Decode_metadata();
 
 			frame = new FlacFrame(PCM.ChannelCount);
 			framereader = new BitReader();
@@ -105,17 +59,17 @@ namespace CUETools.Codecs.FLAKE
 			if ((PCM.BitsPerSample != 16 && PCM.BitsPerSample != 24) || PCM.ChannelCount != 2 || (PCM.SampleRate != 44100 && PCM.SampleRate != 48000))
 				throw new Exception("invalid flac file");
 
-			samplesBuffer = new int[Flake.MAX_BLOCKSIZE * PCM.ChannelCount];
+			Samples = new int[Flake.MAX_BLOCKSIZE * PCM.ChannelCount];
 			residualBuffer = new int[Flake.MAX_BLOCKSIZE * PCM.ChannelCount];
 		}
 
 		public FlakeReader(AudioPCMConfig _pcm)
 		{
-			pcm = _pcm;
+			PCM = _pcm;
 			crc8 = new Crc8();
 			crc16 = new Crc16();
 
-			samplesBuffer = new int[Flake.MAX_BLOCKSIZE * PCM.ChannelCount];
+			Samples = new int[Flake.MAX_BLOCKSIZE * PCM.ChannelCount];
 			residualBuffer = new int[Flake.MAX_BLOCKSIZE * PCM.ChannelCount];
 			frame = new FlacFrame(PCM.ChannelCount);
 			framereader = new BitReader();
@@ -126,15 +80,9 @@ namespace CUETools.Codecs.FLAKE
 			_IO.Close();
 		}
 
-		public long Length
-		{
-			get
-			{
-				return _sampleCount;
-			}
-		}
+        public long Length { get; private set; } = 0;
 
-		public long Remaining
+        public long Remaining
 		{
 			get
 			{
@@ -150,7 +98,7 @@ namespace CUETools.Codecs.FLAKE
 			}
 			set
 			{
-				if (value > _sampleCount)
+				if (value > Length)
 					throw new Exception("seeking past end of stream");
 				if (value < Position || value > _sampleOffset)
 				{
@@ -180,7 +128,7 @@ namespace CUETools.Codecs.FLAKE
 					_samplesInBuffer = 0;
 					_samplesBufferOffset = 0;
 
-					fill_frames_buffer();
+					Fill_frames_buffer();
 					if (_framesBufferLength == 0)
 						throw new Exception("seek failed");
 
@@ -196,33 +144,21 @@ namespace CUETools.Codecs.FLAKE
 			}
 		}
 
-		public AudioPCMConfig PCM
-		{
-			get
-			{
-				return pcm;
-			}
-		}
+        public AudioPCMConfig PCM { get; private set; }
 
-		public string Path
-		{
-			get
-			{
-				return _path;
-			}
-		}
+        public string Path { get; }
 
-		unsafe void interlace(AudioBuffer buff, int offset, int count)
+        unsafe void Interlace(AudioBuffer buff, int offset, int count)
 		{
 			if (PCM.ChannelCount == 2)
 			{
-				fixed (int* src = &samplesBuffer[_samplesBufferOffset])
+				fixed (int* src = &Samples[_samplesBufferOffset])
 					buff.Interlace(offset, src, src + Flake.MAX_BLOCKSIZE, count);
 			}
 			else
 			{
 				for (int ch = 0; ch < PCM.ChannelCount; ch++)
-					fixed (int* res = &buff.Samples[offset, ch], src = &samplesBuffer[_samplesBufferOffset + ch * Flake.MAX_BLOCKSIZE])
+					fixed (int* res = &buff.Samples[offset, ch], src = &Samples[_samplesBufferOffset + ch * Flake.MAX_BLOCKSIZE])
 					{
 						int* psrc = src;
 						for (int i = 0; i < count; i++)
@@ -242,14 +178,14 @@ namespace CUETools.Codecs.FLAKE
 			{
 				if (_samplesInBuffer > 0)
 				{
-					interlace(buff, offset, _samplesInBuffer);
+					Interlace(buff, offset, _samplesInBuffer);
 					sampleCount -= _samplesInBuffer;
 					offset += _samplesInBuffer;
 					_samplesInBuffer = 0;
 					_samplesBufferOffset = 0;
 				}
-				
-				fill_frames_buffer();
+
+				Fill_frames_buffer();
 
 				if (_framesBufferLength == 0)
 				{
@@ -265,7 +201,7 @@ namespace CUETools.Codecs.FLAKE
 				_sampleOffset += _samplesInBuffer;
 			}
 
-			interlace(buff, offset, sampleCount);
+			Interlace(buff, offset, sampleCount);
 			_samplesInBuffer -= sampleCount;
 			_samplesBufferOffset += sampleCount;
 			if (_samplesInBuffer == 0)
@@ -273,7 +209,7 @@ namespace CUETools.Codecs.FLAKE
 			return offset + sampleCount;
 		}
 
-		unsafe void fill_frames_buffer()
+		unsafe void Fill_frames_buffer()
 		{
 			if (_framesBufferLength == 0)
 				_framesBufferOffset = 0;
@@ -292,33 +228,33 @@ namespace CUETools.Codecs.FLAKE
 			}
 		}
 
-		unsafe void decode_frame_header(BitReader bitreader, FlacFrame frame)
+		unsafe void Decode_frame_header(BitReader bitreader, FlacFrame frame)
 		{
 			int header_start = bitreader.Position;
 
-			if (bitreader.readbits(15) != 0x7FFC)
+			if (bitreader.Readbits(15) != 0x7FFC)
 				throw new Exception("invalid frame");
-			uint vbs = bitreader.readbit();
-			frame.bs_code0 = (int) bitreader.readbits(4);
-			uint sr_code0 = bitreader.readbits(4);
-			frame.ch_mode = (ChannelMode)bitreader.readbits(4);
-			uint bps_code = bitreader.readbits(3);
+			uint vbs = bitreader.Readbit();
+			frame.bs_code0 = (int) bitreader.Readbits(4);
+			uint sr_code0 = bitreader.Readbits(4);
+			frame.ch_mode = (ChannelMode)bitreader.Readbits(4);
+			uint bps_code = bitreader.Readbits(3);
 			if (Flake.flac_bitdepths[bps_code] != PCM.BitsPerSample)
 				throw new Exception("unsupported bps coding");
-			uint t1 = bitreader.readbit(); // == 0?????
+			uint t1 = bitreader.Readbit(); // == 0?????
 			if (t1 != 0)
 				throw new Exception("unsupported frame coding");
-			frame.frame_number = (int)bitreader.read_utf8();
+			frame.frame_number = (int)bitreader.Read_utf8();
 
 			// custom block size
 			if (frame.bs_code0 == 6)
 			{
-				frame.bs_code1 = (int)bitreader.readbits(8);
+				frame.bs_code1 = (int)bitreader.Readbits(8);
 				frame.blocksize = frame.bs_code1 + 1;
 			}
 			else if (frame.bs_code0 == 7)
 			{
-				frame.bs_code1 = (int)bitreader.readbits(16);
+				frame.bs_code1 = (int)bitreader.Readbits(16);
 				frame.blocksize = frame.bs_code1 + 1;
 			}
 			else
@@ -344,34 +280,34 @@ namespace CUETools.Codecs.FLAKE
 				throw new Exception("invalid channel mode");
 
 			// CRC-8 of frame header
-			byte crc = do_crc ? crc8.ComputeChecksum(bitreader.Buffer, header_start, bitreader.Position - header_start) : (byte)0;
-			frame.crc8 = (byte)bitreader.readbits(8);
-			if (do_crc && frame.crc8 != crc)
+			byte crc = DoCRC ? crc8.ComputeChecksum(bitreader.Buffer, header_start, bitreader.Position - header_start) : (byte)0;
+			frame.crc8 = (byte)bitreader.Readbits(8);
+			if (DoCRC && frame.crc8 != crc)
 				throw new Exception("header crc mismatch");
 		}
 
-		unsafe void decode_subframe_constant(BitReader bitreader, FlacFrame frame, int ch)
+		unsafe void Decode_subframe_constant(BitReader bitreader, FlacFrame frame, int ch)
 		{
 			int obits = frame.subframes[ch].obits;
-			frame.subframes[ch].best.residual[0] = bitreader.readbits_signed(obits);
+			frame.subframes[ch].best.residual[0] = bitreader.Readbits_signed(obits);
 		}
 
-		unsafe void decode_subframe_verbatim(BitReader bitreader, FlacFrame frame, int ch)
+		unsafe void Decode_subframe_verbatim(BitReader bitreader, FlacFrame frame, int ch)
 		{
 			int obits = frame.subframes[ch].obits;
 			for (int i = 0; i < frame.blocksize; i++)
-				frame.subframes[ch].best.residual[i] = bitreader.readbits_signed(obits);
+				frame.subframes[ch].best.residual[i] = bitreader.Readbits_signed(obits);
 		}
 
-		unsafe void decode_residual(BitReader bitreader, FlacFrame frame, int ch)
+		unsafe void Decode_residual(BitReader bitreader, FlacFrame frame, int ch)
 		{
 			// rice-encoded block
 			// coding method
-			frame.subframes[ch].best.rc.coding_method = (int)bitreader.readbits(2); // ????? == 0
-			if (frame.subframes[ch].best.rc.coding_method != 0 && frame.subframes[ch].best.rc.coding_method != 1) 
+			frame.subframes[ch].best.rc.coding_method = (int)bitreader.Readbits(2); // ????? == 0
+			if (frame.subframes[ch].best.rc.coding_method != 0 && frame.subframes[ch].best.rc.coding_method != 1)
 				throw new Exception("unsupported residual coding");
 			// partition order
-			frame.subframes[ch].best.rc.porder = (int)bitreader.readbits(4);
+			frame.subframes[ch].best.rc.porder = (int)bitreader.Readbits(4);
 			if (frame.subframes[ch].best.rc.porder > 8)
 				throw new Exception("invalid partition order");
 			int psize = frame.blocksize >> frame.subframes[ch].best.rc.porder;
@@ -386,65 +322,65 @@ namespace CUETools.Codecs.FLAKE
 				if (p == 1) res_cnt = psize;
 				int n = Math.Min(res_cnt, frame.blocksize - j);
 
-				int k = frame.subframes[ch].best.rc.rparams[p] = (int)bitreader.readbits(rice_len);
+				int k = frame.subframes[ch].best.rc.rparams[p] = (int)bitreader.Readbits(rice_len);
 				if (k == (1 << rice_len) - 1)
 				{
-					k = frame.subframes[ch].best.rc.esc_bps[p] = (int)bitreader.readbits(5);
+					k = frame.subframes[ch].best.rc.esc_bps[p] = (int)bitreader.Readbits(5);
 					for (int i = n; i > 0; i--)
-						*(r++) = bitreader.readbits_signed((int)k);
+						*(r++) = bitreader.Readbits_signed((int)k);
 				}
 				else
 				{
-					bitreader.read_rice_block(n, (int)k, r);
+					bitreader.Read_rice_block(n, (int)k, r);
 					r += n;
 				}
 				j += n;
 			}
 		}
 
-		unsafe void decode_subframe_fixed(BitReader bitreader, FlacFrame frame, int ch)
+		unsafe void Decode_subframe_fixed(BitReader bitreader, FlacFrame frame, int ch)
 		{
 			// warm-up samples
 			int obits = frame.subframes[ch].obits;
 			for (int i = 0; i < frame.subframes[ch].best.order; i++)
-				frame.subframes[ch].best.residual[i] = bitreader.readbits_signed(obits);
+				frame.subframes[ch].best.residual[i] = bitreader.Readbits_signed(obits);
 
 			// residual
-			decode_residual(bitreader, frame, ch);
+			Decode_residual(bitreader, frame, ch);
 		}
 
-		unsafe void decode_subframe_lpc(BitReader bitreader, FlacFrame frame, int ch)
+		unsafe void Decode_subframe_lpc(BitReader bitreader, FlacFrame frame, int ch)
 		{
 			// warm-up samples
 			int obits = frame.subframes[ch].obits;
 			for (int i = 0; i < frame.subframes[ch].best.order; i++)
-				frame.subframes[ch].best.residual[i] = bitreader.readbits_signed(obits);
+				frame.subframes[ch].best.residual[i] = bitreader.Readbits_signed(obits);
 
 			// LPC coefficients
-			frame.subframes[ch].best.cbits = (int)bitreader.readbits(4) + 1; // lpc_precision
-			frame.subframes[ch].best.shift = bitreader.readbits_signed(5);
+			frame.subframes[ch].best.cbits = (int)bitreader.Readbits(4) + 1; // lpc_precision
+			frame.subframes[ch].best.shift = bitreader.Readbits_signed(5);
 			if (frame.subframes[ch].best.shift < 0)
 				throw new Exception("negative shift");
 			for (int i = 0; i < frame.subframes[ch].best.order; i++)
-				frame.subframes[ch].best.coefs[i] = bitreader.readbits_signed(frame.subframes[ch].best.cbits);
+				frame.subframes[ch].best.coefs[i] = bitreader.Readbits_signed(frame.subframes[ch].best.cbits);
 
 			// residual
-			decode_residual(bitreader, frame, ch);
+			Decode_residual(bitreader, frame, ch);
 		}
 
-		unsafe void decode_subframes(BitReader bitreader, FlacFrame frame)
+		unsafe void Decode_subframes(BitReader bitreader, FlacFrame frame)
 		{
-			fixed (int *r = residualBuffer, s = samplesBuffer)
+			fixed (int *r = residualBuffer, s = Samples)
 				for (int ch = 0; ch < PCM.ChannelCount; ch++)
 			{
 				// subframe header
-				uint t1 = bitreader.readbit(); // ?????? == 0
+				uint t1 = bitreader.Readbit(); // ?????? == 0
 				if (t1 != 0)
 					throw new Exception("unsupported subframe coding (ch == " + ch.ToString() + ")");
-				int type_code = (int)bitreader.readbits(6);
-				frame.subframes[ch].wbits = (int)bitreader.readbit();
+				int type_code = (int)bitreader.Readbits(6);
+				frame.subframes[ch].wbits = (int)bitreader.Readbit();
 				if (frame.subframes[ch].wbits != 0)
-					frame.subframes[ch].wbits += (int)bitreader.read_unary();
+					frame.subframes[ch].wbits += (int)bitreader.Read_unary();
 
 				frame.subframes[ch].obits = PCM.BitsPerSample - frame.subframes[ch].wbits;
 				switch (frame.ch_mode)
@@ -475,16 +411,16 @@ namespace CUETools.Codecs.FLAKE
 				switch (frame.subframes[ch].best.type)
 				{
 					case SubframeType.Constant:
-						decode_subframe_constant(bitreader, frame, ch);
+						Decode_subframe_constant(bitreader, frame, ch);
 						break;
 					case SubframeType.Verbatim:
-						decode_subframe_verbatim(bitreader, frame, ch);
+						Decode_subframe_verbatim(bitreader, frame, ch);
 						break;
 					case SubframeType.Fixed:
-						decode_subframe_fixed(bitreader, frame, ch);
+						Decode_subframe_fixed(bitreader, frame, ch);
 						break;
 					case SubframeType.LPC:
-						decode_subframe_lpc(bitreader, frame, ch);
+						Decode_subframe_lpc(bitreader, frame, ch);
 						break;
 					default:
 						throw new Exception("invalid subframe type");
@@ -492,7 +428,7 @@ namespace CUETools.Codecs.FLAKE
 			}
 		}
 
-		unsafe void restore_samples_fixed(FlacFrame frame, int ch)
+		unsafe void Restore_samples_fixed(FlacFrame frame, int ch)
 		{
 			FlacSubframeInfo sub = frame.subframes[ch];
 
@@ -538,7 +474,7 @@ namespace CUETools.Codecs.FLAKE
 			}
 		}
 
-		unsafe void restore_samples_lpc(FlacFrame frame, int ch)
+		unsafe void Restore_samples_lpc(FlacFrame frame, int ch)
 		{
 			FlacSubframeInfo sub = frame.subframes[ch];
 			ulong csum = 0;
@@ -547,13 +483,13 @@ namespace CUETools.Codecs.FLAKE
 				for (int i = sub.best.order; i > 0; i--)
 					csum += (ulong)Math.Abs(coefs[i - 1]);
 				if ((csum << sub.obits) >= 1UL << 32)
-					lpc.decode_residual_long(sub.best.residual, sub.samples, frame.blocksize, sub.best.order, coefs, sub.best.shift);
+					Lpc.Decode_residual_long(sub.best.residual, sub.samples, frame.blocksize, sub.best.order, coefs, sub.best.shift);
 				else
-					lpc.decode_residual(sub.best.residual, sub.samples, frame.blocksize, sub.best.order, coefs, sub.best.shift);
+					Lpc.Decode_residual(sub.best.residual, sub.samples, frame.blocksize, sub.best.order, coefs, sub.best.shift);
 			}
 		}
 
-		unsafe void restore_samples(FlacFrame frame)
+		unsafe void Restore_samples(FlacFrame frame)
 		{
 			for (int ch = 0; ch < PCM.ChannelCount; ch++)
 			{
@@ -566,10 +502,10 @@ namespace CUETools.Codecs.FLAKE
 						AudioSamples.MemCpy(frame.subframes[ch].samples, frame.subframes[ch].best.residual, frame.blocksize);
 						break;
 					case SubframeType.Fixed:
-						restore_samples_fixed(frame, ch);
+						Restore_samples_fixed(frame, ch);
 						break;
 					case SubframeType.LPC:
-						restore_samples_lpc(frame, ch);
+						Restore_samples_lpc(frame, ch);
 						break;
 				}
 				if (frame.subframes[ch].wbits != 0)
@@ -619,21 +555,21 @@ namespace CUETools.Codecs.FLAKE
 			fixed (byte* buf = buffer)
 			{
 				framereader.Reset(buf, pos, len);
-				decode_frame_header(framereader, frame);
-				decode_subframes(framereader, frame);
-				framereader.flush();
-				ushort crc_1 = do_crc ? crc16.ComputeChecksum(framereader.Buffer + pos, framereader.Position - pos) : (ushort)0;
-				ushort crc_2 = (ushort)framereader.readbits(16);
-				if (do_crc && crc_1 != crc_2)
+				Decode_frame_header(framereader, frame);
+				Decode_subframes(framereader, frame);
+				framereader.Flush();
+				ushort crc_1 = DoCRC ? crc16.ComputeChecksum(framereader.Buffer + pos, framereader.Position - pos) : (ushort)0;
+				ushort crc_2 = (ushort)framereader.Readbits(16);
+				if (DoCRC && crc_1 != crc_2)
 					throw new Exception("frame crc mismatch");
-				restore_samples(frame);
+				Restore_samples(frame);
 				_samplesInBuffer = frame.blocksize;
 				return framereader.Position - pos;
 			}
 		}
 
 
-		bool skip_bytes(int bytes)
+		bool Skip_bytes(int bytes)
 		{
 			for (int j = 0; j < bytes; j++)
 				if (0 == _IO.Read(_framesBuffer, 0, 1))
@@ -641,11 +577,10 @@ namespace CUETools.Codecs.FLAKE
 			return true;
 		}
 
-		unsafe void decode_metadata()
+		unsafe void Decode_metadata()
 		{
 			byte x;
 			int i, id;
-			bool first = true;
 			byte[] FLAC__STREAM_SYNC_STRING = new byte[] { (byte)'f', (byte)'L', (byte)'a', (byte)'C' };
 			byte[] ID3V2_TAG_ = new byte[] { (byte)'I', (byte)'D', (byte)'3' };
 
@@ -656,8 +591,7 @@ namespace CUETools.Codecs.FLAKE
 				x = _framesBuffer[0];
 				if (x == FLAC__STREAM_SYNC_STRING[i])
 				{
-					first = true;
-					i++;
+                    i++;
 					id = 0;
 					continue;
 				}
@@ -667,7 +601,7 @@ namespace CUETools.Codecs.FLAKE
 					i = 0;
 					if (id == 3)
 					{
-						if (!skip_bytes(3))
+						if (!Skip_bytes(3))
 							throw new Exception("FLAC stream not found");
 						int skip = 0;
 						for (int j = 0; j < 4; j++)
@@ -677,7 +611,7 @@ namespace CUETools.Codecs.FLAKE
 							skip <<= 7;
 							skip |= ((int)_framesBuffer[0] & 0x7f);
 						}
-						if (!skip_bytes(skip))
+						if (!Skip_bytes(skip))
 							throw new Exception("FLAC stream not found");
 					}
 					continue;
@@ -703,13 +637,13 @@ namespace CUETools.Codecs.FLAKE
 
 			do
 			{
-				fill_frames_buffer();
+				Fill_frames_buffer();
 				fixed (byte* buf = _framesBuffer)
 				{
 					BitReader bitreader = new BitReader(buf, _framesBufferOffset, _framesBufferLength - _framesBufferOffset);
-					bool is_last = bitreader.readbit() != 0;
-					MetadataType type = (MetadataType)bitreader.readbits(7);
-					int len = (int)bitreader.readbits(24);
+					bool is_last = bitreader.Readbit() != 0;
+					MetadataType type = (MetadataType)bitreader.Readbits(7);
+					int len = (int)bitreader.Readbits(24);
 
 					if (type == MetadataType.StreamInfo)
 					{
@@ -723,16 +657,16 @@ namespace CUETools.Codecs.FLAKE
 						const int FLAC__STREAM_METADATA_STREAMINFO_TOTAL_SAMPLES_LEN = 36; /* bits */
 						const int FLAC__STREAM_METADATA_STREAMINFO_MD5SUM_LEN = 128; /* bits */
 
-						min_block_size = bitreader.readbits(FLAC__STREAM_METADATA_STREAMINFO_MIN_BLOCK_SIZE_LEN);
-						max_block_size = bitreader.readbits(FLAC__STREAM_METADATA_STREAMINFO_MAX_BLOCK_SIZE_LEN);
-						min_frame_size = bitreader.readbits(FLAC__STREAM_METADATA_STREAMINFO_MIN_FRAME_SIZE_LEN);
-						max_frame_size = bitreader.readbits(FLAC__STREAM_METADATA_STREAMINFO_MAX_FRAME_SIZE_LEN);
-						int sample_rate = (int)bitreader.readbits(FLAC__STREAM_METADATA_STREAMINFO_SAMPLE_RATE_LEN);
-						int channels = 1 + (int)bitreader.readbits(FLAC__STREAM_METADATA_STREAMINFO_CHANNELS_LEN);
-						int bits_per_sample = 1 + (int)bitreader.readbits(FLAC__STREAM_METADATA_STREAMINFO_BITS_PER_SAMPLE_LEN);
-						pcm = new AudioPCMConfig(bits_per_sample, channels, sample_rate);
-						_sampleCount = (long)bitreader.readbits64(FLAC__STREAM_METADATA_STREAMINFO_TOTAL_SAMPLES_LEN);
-						bitreader.skipbits(FLAC__STREAM_METADATA_STREAMINFO_MD5SUM_LEN);
+						min_block_size = bitreader.Readbits(FLAC__STREAM_METADATA_STREAMINFO_MIN_BLOCK_SIZE_LEN);
+						max_block_size = bitreader.Readbits(FLAC__STREAM_METADATA_STREAMINFO_MAX_BLOCK_SIZE_LEN);
+						min_frame_size = bitreader.Readbits(FLAC__STREAM_METADATA_STREAMINFO_MIN_FRAME_SIZE_LEN);
+						max_frame_size = bitreader.Readbits(FLAC__STREAM_METADATA_STREAMINFO_MAX_FRAME_SIZE_LEN);
+						int sample_rate = (int)bitreader.Readbits(FLAC__STREAM_METADATA_STREAMINFO_SAMPLE_RATE_LEN);
+						int channels = 1 + (int)bitreader.Readbits(FLAC__STREAM_METADATA_STREAMINFO_CHANNELS_LEN);
+						int bits_per_sample = 1 + (int)bitreader.Readbits(FLAC__STREAM_METADATA_STREAMINFO_BITS_PER_SAMPLE_LEN);
+						PCM = new AudioPCMConfig(bits_per_sample, channels, sample_rate);
+						Length = (long)bitreader.Readbits64(FLAC__STREAM_METADATA_STREAMINFO_TOTAL_SAMPLES_LEN);
+						bitreader.Skipbits(FLAC__STREAM_METADATA_STREAMINFO_MD5SUM_LEN);
 					}
 					else if (type == MetadataType.Seektable)
 					{
@@ -740,9 +674,9 @@ namespace CUETools.Codecs.FLAKE
 						seek_table = new SeekPoint[num_entries];
 						for (int e = 0; e < num_entries; e++)
 						{
-							seek_table[e].number = (long)bitreader.readbits64(Flake.FLAC__STREAM_METADATA_SEEKPOINT_SAMPLE_NUMBER_LEN);
-							seek_table[e].offset = (long)bitreader.readbits64(Flake.FLAC__STREAM_METADATA_SEEKPOINT_STREAM_OFFSET_LEN);
-							seek_table[e].framesize = (int)bitreader.readbits24(Flake.FLAC__STREAM_METADATA_SEEKPOINT_FRAME_SAMPLES_LEN);
+							seek_table[e].number = (long)bitreader.Readbits64(Flake.FLAC__STREAM_METADATA_SEEKPOINT_SAMPLE_NUMBER_LEN);
+							seek_table[e].offset = (long)bitreader.Readbits64(Flake.FLAC__STREAM_METADATA_SEEKPOINT_STREAM_OFFSET_LEN);
+							seek_table[e].framesize = (int)bitreader.Readbits24(Flake.FLAC__STREAM_METADATA_SEEKPOINT_FRAME_SAMPLES_LEN);
 						}
 					}
 					if (_framesBufferLength < 4 + len)

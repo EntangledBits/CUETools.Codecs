@@ -2,13 +2,13 @@ using System;
 
 namespace CUETools.Codecs
 {
-	public class lpc
+	public class Lpc
 	{
 		public const int MAX_LPC_ORDER = 32;
 		public const int MAX_LPC_WINDOWS = 2;
 		public const int MAX_LPC_PRECISIONS = 4;
 
-		public unsafe static void window_welch(float* window, int L)
+		public unsafe static void Window_welch(float* window, int L)
 		{
 			int N = L - 1;
 			double N2 = (double)N / 2.0;
@@ -21,7 +21,7 @@ namespace CUETools.Codecs
 			}
 		}
 
-		public unsafe static void window_bartlett(float* window, int L)
+		public unsafe static void Window_bartlett(float* window, int L)
 		{
 			int N = L - 1;
 			double N2 = (double)N / 2.0;
@@ -33,22 +33,22 @@ namespace CUETools.Codecs
 			}
 		}
 
-		public unsafe static void window_rectangle(float* window, int L)
+		public unsafe static void Window_rectangle(float* window, int L)
 		{
 			for (int n = 0; n < L; n++)
 				window[n] = 1.0F;
 		}
 
-		public unsafe static void window_flattop(float* window, int L)
+		public unsafe static void Window_flattop(float* window, int L)
 		{
 			int N = L - 1;
 			for (int n = 0; n < L; n++)
 				window[n] = (float)(1.0 - 1.93 * Math.Cos(2.0 * Math.PI * n / N) + 1.29 * Math.Cos(4.0 * Math.PI * n / N) - 0.388 * Math.Cos(6.0 * Math.PI * n / N) + 0.0322 * Math.Cos(8.0 * Math.PI * n / N));
 		}
 
-		public unsafe static void window_tukey(float* window, int L)
+		public unsafe static void Window_tukey(float* window, int L)
 		{
-			window_rectangle(window, L);
+			Window_rectangle(window, L);
 			double p = 0.5;
 			int Np = (int)(p / 2.0 * L) - 1;
 			if (Np > 0)
@@ -61,20 +61,19 @@ namespace CUETools.Codecs
 			}
 		}
 
-		public unsafe static void window_hann(float* window, int L)
+		public unsafe static void Window_hann(float* window, int L)
 		{
 			int N = L - 1;
 			for (int n = 0; n < L; n++)
 				window[n] = (float)(0.5 - 0.5 * Math.Cos(2.0 * Math.PI * n / N));
 		}
 
-		private static short sign_only(int val)
+		private static short Sign_only(int val)
 		{
 			return (short)((val >> 31) + ((val - 1) >> 31) + 1);
 		}
 
-		static public unsafe void
-			compute_corr_int(/*const*/ short* data1, short* data2, int len, int min, int lag, int* autoc)
+		static public unsafe void Compute_corr_int(/*const*/ short* data1, short* data2, int len, int min, int lag, int* autoc)
 		{
 			for (int i = min; i <= lag; ++i)
 			{
@@ -97,8 +96,7 @@ namespace CUETools.Codecs
 		 * Calculates autocorrelation data from audio samples
 		 * A window function is applied before calculation.
 		 */
-		static public unsafe void
-			compute_autocorr(/*const*/ int* data, int len, int min, int lag, double* autoc, float* window)
+		static public unsafe void Compute_autocorr(/*const*/ int* data, int len, int min, int lag, double* autoc, float* window)
 		{
 #if FPAC
 			short* data1 = stackalloc short[len + 1];
@@ -121,11 +119,11 @@ namespace CUETools.Codecs
 			compute_corr_int(data1, data2, len, min, lag, c2);
 			compute_corr_int(data2, data1, len, min, lag, c3);
 			compute_corr_int(data2, data2, len, min, lag, c4);
-			
+
 			for (int coeff = min; coeff <= lag; coeff++)
 			    autoc[coeff] = (c1[coeff] * (double)(1 << 18) + (c2[coeff] + c3[coeff]) * (double)(1 << 9) + c4[coeff]);
 #else
-			double* data1 = stackalloc double[(int)len + 16];
+			double* data1 = stackalloc double[len + 16];
 			int i;
 
 			for (i = 0; i < len; i++)
@@ -152,8 +150,7 @@ namespace CUETools.Codecs
 		 * Levinson-Durbin recursion.
 		 * Produces LPC coefficients from autocorrelation data.
 		 */
-		public static unsafe void
-		compute_lpc_coefs(uint max_order, double* reff, float* lpc/*[][MAX_LPC_ORDER]*/)
+		public static unsafe void Compute_lpc_coefs(uint max_order, double* reff, float* lpc/*[][MAX_LPC_ORDER]*/)
 		{
 			double* lpc_tmp = stackalloc double[MAX_LPC_ORDER];
 
@@ -183,9 +180,7 @@ namespace CUETools.Codecs
 			}
 		}
 
-		public static unsafe void
-		compute_schur_reflection(/*const*/ double* autoc, uint max_order,
-							  double* reff/*[][MAX_LPC_ORDER]*/, double * err)
+		public static unsafe void Compute_schur_reflection(/*const*/ double* autoc, uint max_order, double* reff/*[][MAX_LPC_ORDER]*/, double * err)
 		{
 			double* gen0 = stackalloc double[MAX_LPC_ORDER];
 			double* gen1 = stackalloc double[MAX_LPC_ORDER];
@@ -214,9 +209,7 @@ namespace CUETools.Codecs
 		/**
 		 * Quantize LPC coefficients
 		 */
-		public static unsafe void
-		quantize_lpc_coefs(float* lpc_in, int order, uint precision, int* lpc_out,
-						   out int shift, int max_shift, int zero_shift)
+		public static unsafe void Quantize_lpc_coefs(float* lpc_in, int order, uint precision, int* lpc_out, out int shift, int max_shift, int zero_shift)
 		{
 			int i;
 			float d, cmax, error;
@@ -275,9 +268,7 @@ namespace CUETools.Codecs
 			shift = sh;
 		}
 
-		public static unsafe void
-		encode_residual(int* res, int* smp, int n, int order,
-			int* coefs, int shift)
+		public static unsafe void Encode_residual(int* res, int* smp, int n, int order,int* coefs, int shift)
 		{
 			for (int i = 0; i < order; i++)
 				res[i] = smp[i];
@@ -378,7 +369,7 @@ namespace CUETools.Codecs
 					{
 						int* c = coefs + order - 1;
 						int pred =
-							*(c--) * *(s++) + 
+							*(c--) * *(s++) +
 							*(c--) * *(s++) + *(c--) * *(s++) +
 							*(c--) * *(s++) + *(c--) * *(s++) +
 							*(c--) * *(s++) + *(c--) * *(s++) +
@@ -453,9 +444,7 @@ namespace CUETools.Codecs
 			}
 		}
 
-		public static unsafe void
-		encode_residual_long(int* res, int* smp, int n, int order,
-			int* coefs, int shift)
+		public static unsafe void Encode_residual_long(int* res, int* smp, int n, int order,int* coefs, int shift)
 		{
 			for (int i = 0; i < order; i++)
 				res[i] = smp[i];
@@ -579,9 +568,7 @@ namespace CUETools.Codecs
 			}
 		}
 
-		public static unsafe void
-		encode_residual2(int* res, int* smp, int n, int order,
-			int* coefs, int shift)
+		public static unsafe void Encode_residual2(int* res, int* smp, int n, int order,int* coefs, int shift)
 		{
 			int* s = smp;
 			int* r = res;
@@ -754,9 +741,7 @@ namespace CUETools.Codecs
 			}
 		}
 
-		public static unsafe void
-		decode_residual(int* res, int* smp, int n, int order,
-			int* coefs, int shift)
+		public static unsafe void Decode_residual(int* res, int* smp, int n, int order,int* coefs, int shift)
 		{
 			for (int i = 0; i < order; i++)
 				smp[i] = res[i];
@@ -900,7 +885,7 @@ namespace CUETools.Codecs
 					for (int i = n - order; i > 0; i--)
 					{
 						int* co = coefs + order - 1;
-						int pred = 
+						int pred =
 							*(co--) * *(s++) + *(co--) * *(s++) +
 							*(co--) * *(s++) + *(co--) * *(s++) +
 							*(co--) * *(s++) + *(co--) * *(s++) +
@@ -933,9 +918,7 @@ namespace CUETools.Codecs
 					break;
 			}
 		}
-		public static unsafe void
-		decode_residual_long(int* res, int* smp, int n, int order,
-			int* coefs, int shift)
+		public static unsafe void Decode_residual_long(int* res, int* smp, int n, int order, int* coefs, int shift)
 		{
 			for (int i = 0; i < order; i++)
 				smp[i] = res[i];

@@ -9,22 +9,13 @@ namespace CUETools.Codecs
     {
         private Stream _IO;
         private BinaryWriter _bw;
-        private AudioPCMConfig _pcm;
-        private long _sampleLen;
-        private string _path;
         private long hdrLen = 0;
         private bool _headersWritten = false;
         private long _finalSampleCount = -1;
         private List<byte[]> _chunks = null;
         private List<uint> _chunkFCCs = null;
 
-        public long Position
-        {
-            get
-            {
-                return _sampleLen;
-            }
-        }
+        public long Position { get; private set; }
 
         public long FinalSampleCount
         {
@@ -60,18 +51,15 @@ namespace CUETools.Codecs
             set { }
         }
 
-        public AudioPCMConfig PCM
-        {
-            get { return _pcm; }
-        }
+        public AudioPCMConfig PCM { get; }
 
-        public string Path { get { return _path; } }
+        public string Path { get; }
 
         public WAVWriter(string path, Stream IO, AudioPCMConfig pcm)
         {
-            _pcm = pcm;
-            _path = path;
-            _IO = IO != null ? IO : new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
+            PCM = pcm;
+            Path = path;
+            _IO = IO ?? new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
             _bw = new BinaryWriter(_IO);
         }
 
@@ -82,7 +70,7 @@ namespace CUETools.Codecs
 
         public void WriteChunk(uint fcc, byte[] data)
         {
-            if (_sampleLen > 0)
+            if (Position > 0)
                 throw new Exception("data already written, no chunks allowed");
             if (_chunks == null)
             {
@@ -101,11 +89,11 @@ namespace CUETools.Codecs
             const uint fccFormat = 0x20746D66;
             const uint fccData = 0x61746164;
 
-            bool wavex = _pcm.BitsPerSample != 16 && _pcm.BitsPerSample != 24;
+            bool wavex = PCM.BitsPerSample != 16 && PCM.BitsPerSample != 24;
 
             hdrLen += 36 + (wavex ? 24 : 0) + 8;
 
-            uint dataLen = (uint)(_finalSampleCount * _pcm.BlockAlign);
+            uint dataLen = (uint)(_finalSampleCount * PCM.BlockAlign);
             uint dataLenPadded = dataLen + (dataLen & 1);
 
             _bw.Write(fccRIFF);
@@ -122,15 +110,15 @@ namespace CUETools.Codecs
                 _bw.Write((uint)16);
                 _bw.Write((ushort)1); // PCM
             }
-            _bw.Write((ushort)_pcm.ChannelCount);
-            _bw.Write((uint)_pcm.SampleRate);
-            _bw.Write((uint)(_pcm.SampleRate * _pcm.BlockAlign));
-            _bw.Write((ushort)_pcm.BlockAlign);
-            _bw.Write((ushort)((_pcm.BitsPerSample + 7) / 8 * 8));
+            _bw.Write((ushort)PCM.ChannelCount);
+            _bw.Write((uint)PCM.SampleRate);
+            _bw.Write((uint)(PCM.SampleRate * PCM.BlockAlign));
+            _bw.Write((ushort)PCM.BlockAlign);
+            _bw.Write((ushort)((PCM.BitsPerSample + 7) / 8 * 8));
             if (wavex)
             {
                 _bw.Write((ushort)22); // length of WAVEX structure
-                _bw.Write((ushort)_pcm.BitsPerSample);
+                _bw.Write((ushort)PCM.BitsPerSample);
                 _bw.Write((uint)3); // speaker positions (3 == stereo)
                 _bw.Write((ushort)1); // PCM
                 _bw.Write((ushort)0);
@@ -166,11 +154,11 @@ namespace CUETools.Codecs
             if (_finalSampleCount <= 0)
             {
                 const long maxFileSize = 0x7FFFFFFEL;
-                long dataLen = _sampleLen * _pcm.BlockAlign;
+                long dataLen = Position * PCM.BlockAlign;
                 if ((dataLen & 1) == 1)
                     _bw.Write((byte)0);
                 if (dataLen + hdrLen > maxFileSize)
-                    dataLen = ((maxFileSize - hdrLen) / _pcm.BlockAlign) * _pcm.BlockAlign;
+                    dataLen = ((maxFileSize - hdrLen) / PCM.BlockAlign) * PCM.BlockAlign;
                 long dataLenPadded = dataLen + (dataLen & 1);
 
                 _bw.Seek(4, SeekOrigin.Begin);
@@ -185,7 +173,7 @@ namespace CUETools.Codecs
             _bw = null;
             _IO = null;
 
-            if (_finalSampleCount > 0 && _sampleLen != _finalSampleCount)
+            if (_finalSampleCount > 0 && Position != _finalSampleCount)
                 throw new Exception("Samples written differs from the expected sample count.");
         }
 
@@ -194,7 +182,7 @@ namespace CUETools.Codecs
             _bw.Close();
             _bw = null;
             _IO = null;
-            File.Delete(_path);
+            File.Delete(Path);
         }
 
         public void Write(AudioBuffer buff)
@@ -205,7 +193,7 @@ namespace CUETools.Codecs
             if (!_headersWritten)
                 WriteHeaders();
             _IO.Write(buff.Bytes, 0, buff.ByteLength);
-            _sampleLen += buff.Length;
+            Position += buff.Length;
         }
     }
 }

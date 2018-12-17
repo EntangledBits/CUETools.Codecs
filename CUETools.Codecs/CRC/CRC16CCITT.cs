@@ -6,7 +6,7 @@ namespace CUETools.Codecs
 	{
 		const ushort poly = 4129;
 		ushort[] table = new ushort[256];
-		ushort initialValue = 0;
+        readonly ushort initialValue = 0;
 
 		public ushort ComputeChecksum(byte[] bytes, int pos, int count)
 		{

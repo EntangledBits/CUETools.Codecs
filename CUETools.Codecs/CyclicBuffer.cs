@@ -6,8 +6,8 @@ namespace CUETools.Codecs
 {
     public class CyclicBuffer
     {
-        private byte[] _buffer;
-        private int _size;
+        private readonly byte[] _buffer;
+        private readonly int _size;
         private int _start = 0; // moved only by Write
         private int _end = 0; // moved only by Read
         private bool _eof = false;
@@ -46,35 +46,39 @@ namespace CUETools.Codecs
 
         public void ReadFrom(Stream input)
         {
-            _readThread = new Thread(PumpRead);
-            _readThread.Priority = ThreadPriority.Highest;
-            _readThread.IsBackground = true;
+            _readThread = new Thread(PumpRead)
+            {
+                Priority = ThreadPriority.Highest,
+                IsBackground = true
+            };
             _readThread.Start(input);
         }
 
         public void WriteTo(Stream output)
         {
-            WriteTo(flushOutputToStream, closeOutputToStream, ThreadPriority.Highest, output);
+            WriteTo(FlushOutputToStream, CloseOutputToStream, ThreadPriority.Highest, output);
         }
 
         public void WriteTo(FlushOutput flushOutputDelegate, CloseOutput closeOutputDelegate, ThreadPriority priority, object to)
         {
             if (flushOutputDelegate != null)
-                flushOutput += flushOutputDelegate;
+                FlushOutputEvent += flushOutputDelegate;
             if (closeOutputDelegate != null)
-                closeOutput += closeOutputDelegate;
-            _writeThread = new Thread(FlushThread);
-            _writeThread.Priority = priority;
-            _writeThread.IsBackground = true;
+                CloseOutputEvent += closeOutputDelegate;
+            _writeThread = new Thread(FlushThread)
+            {
+                Priority = priority,
+                IsBackground = true
+            };
             _writeThread.Start(to);
         }
 
-        private void closeOutputToStream(object to)
+        private void CloseOutputToStream(object to)
         {
             ((Stream)to).Close();
         }
 
-        private void flushOutputToStream(byte[] buffer, int pos, int chunk, object to)
+        private void FlushOutputToStream(byte[] buffer, int pos, int chunk, object to)
         {
             ((Stream)to).Write(buffer, pos, chunk);
         }
@@ -173,7 +177,7 @@ namespace CUETools.Codecs
                     pos = _start % _size;
                     chunk = Math.Min(DataAvailable, _size - pos);
                 }
-                if (flushOutput != null)
+                if (FlushOutputEvent != null)
                     Array.Copy(_buffer, pos, buff, offs, chunk);
                 offs += chunk;
                 lock (this)
@@ -198,10 +202,10 @@ namespace CUETools.Codecs
                     pos = _start % _size;
                     chunk = Math.Min(DataAvailable, _size - pos);
                 }
-                if (flushOutput != null)
+                if (FlushOutputEvent != null)
                     try
                     {
-                        flushOutput(_buffer, pos, chunk, to);
+                        FlushOutputEvent(_buffer, pos, chunk, to);
                     }
                     catch (Exception ex)
                     {
@@ -218,14 +222,13 @@ namespace CUETools.Codecs
                     Monitor.Pulse(this);
                 }
             }
-            if (closeOutput != null)
-                closeOutput(to);
+            CloseOutputEvent?.Invoke(to);
         }
 
         public delegate void FlushOutput(byte[] buffer, int pos, int chunk, object to);
         public delegate void CloseOutput(object to);
 
-        public event FlushOutput flushOutput;
-        public event CloseOutput closeOutput;
+        public event FlushOutput FlushOutputEvent;
+        public event CloseOutput CloseOutputEvent;
     }
 }

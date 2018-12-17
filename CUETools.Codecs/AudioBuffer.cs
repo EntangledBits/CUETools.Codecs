@@ -218,31 +218,21 @@ namespace CUETools.Codecs
         private int[,] samples;
         private float[,] fsamples;
         private byte[] bytes;
-        private int length;
-        private int size;
-        private AudioPCMConfig pcm;
         private bool dataInSamples = false;
         private bool dataInBytes = false;
         private bool dataInFloat = false;
 
-        public int Length
-        {
-            get { return length; }
-            set { length = value; }
-        }
+        public int Length { get; set; }
 
-        public int Size
-        {
-            get { return size; }
-        }
+        public int Size { get; private set; }
 
-        public AudioPCMConfig PCM { get { return pcm; } }
+        public AudioPCMConfig PCM { get; }
 
         public int ByteLength
         {
             get
             {
-                return length * pcm.BlockAlign;
+                return Length * PCM.BlockAlign;
             }
         }
 
@@ -250,10 +240,10 @@ namespace CUETools.Codecs
         {
             get
             {
-                if (samples == null || samples.GetLength(0) < length)
-                    samples = new int[size, pcm.ChannelCount];
-                if (!dataInSamples && dataInBytes && length != 0)
-                    BytesToFLACSamples(bytes, 0, samples, 0, length, pcm.ChannelCount, pcm.BitsPerSample);
+                if (samples == null || samples.GetLength(0) < Length)
+                    samples = new int[Size, PCM.ChannelCount];
+                if (!dataInSamples && dataInBytes && Length != 0)
+                    BytesToFLACSamples(bytes, 0, samples, 0, Length, PCM.ChannelCount, PCM.BitsPerSample);
                 dataInSamples = true;
                 return samples;
             }
@@ -263,16 +253,16 @@ namespace CUETools.Codecs
         {
             get
             {
-                if (fsamples == null || fsamples.GetLength(0) < length)
-                    fsamples = new float[size, pcm.ChannelCount];
-                if (!dataInFloat && dataInBytes && length != 0)
+                if (fsamples == null || fsamples.GetLength(0) < Length)
+                    fsamples = new float[Size, PCM.ChannelCount];
+                if (!dataInFloat && dataInBytes && Length != 0)
                 {
-                    if (pcm.BitsPerSample == 16)
-                        Bytes16ToFloat(bytes, 0, fsamples, 0, length, pcm.ChannelCount);
+                    if (PCM.BitsPerSample == 16)
+                        Bytes16ToFloat(bytes, 0, fsamples, 0, Length, PCM.ChannelCount);
                     //else if (pcm.BitsPerSample > 16 && PCM.BitsPerSample <= 24)
                     //    BytesToFLACSamples_24(bytes, 0, fsamples, 0, length, pcm.ChannelCount, 24 - pcm.BitsPerSample);
-                    else if (pcm.BitsPerSample == 32)
-                        Buffer.BlockCopy(bytes, 0, fsamples, 0, length * 4 * pcm.ChannelCount);
+                    else if (PCM.BitsPerSample == 32)
+                        Buffer.BlockCopy(bytes, 0, fsamples, 0, Length * 4 * PCM.ChannelCount);
                     else
                         throw new Exception("Unsupported bitsPerSample value");
                 }
@@ -285,14 +275,14 @@ namespace CUETools.Codecs
         {
             get
             {
-                if (bytes == null || bytes.Length < length * pcm.BlockAlign)
-                    bytes = new byte[size * pcm.BlockAlign];
-                if (!dataInBytes && length != 0)
+                if (bytes == null || bytes.Length < Length * PCM.BlockAlign)
+                    bytes = new byte[Size * PCM.BlockAlign];
+                if (!dataInBytes && Length != 0)
                 {
                     if (dataInSamples)
-                        FLACSamplesToBytes(samples, 0, bytes, 0, length, pcm.ChannelCount, pcm.BitsPerSample);
+                        FLACSamplesToBytes(samples, 0, bytes, 0, Length, PCM.ChannelCount, PCM.BitsPerSample);
                     else if (dataInFloat)
-                        FloatToBytes(fsamples, 0, bytes, 0, length, pcm.ChannelCount, pcm.BitsPerSample);
+                        FloatToBytes(fsamples, 0, bytes, 0, Length, PCM.ChannelCount, PCM.BitsPerSample);
                 }
                 dataInBytes = true;
                 return bytes;
@@ -301,45 +291,45 @@ namespace CUETools.Codecs
 
         public AudioBuffer(AudioPCMConfig _pcm, int _size)
         {
-            pcm = _pcm;
-            size = _size;
-            length = 0;
+            PCM = _pcm;
+            Size = _size;
+            Length = 0;
         }
 
         public AudioBuffer(AudioPCMConfig _pcm, int[,] _samples, int _length)
         {
-            pcm = _pcm;
+            PCM = _pcm;
             // assert _samples.GetLength(1) == pcm.ChannelCount
             Prepare(_samples, _length);
         }
 
         public AudioBuffer(AudioPCMConfig _pcm, byte[] _bytes, int _length)
         {
-            pcm = _pcm;
+            PCM = _pcm;
             Prepare(_bytes, _length);
         }
 
         public AudioBuffer(IAudioSource source, int _size)
         {
-            pcm = source.PCM;
-            size = _size;
+            PCM = source.PCM;
+            Size = _size;
         }
 
         public void Prepare(IAudioDest dest)
         {
-            if (dest.PCM.ChannelCount != pcm.ChannelCount || dest.PCM.BitsPerSample != pcm.BitsPerSample)
+            if (dest.PCM.ChannelCount != PCM.ChannelCount || dest.PCM.BitsPerSample != PCM.BitsPerSample)
                 throw new Exception("AudioBuffer format mismatch");
         }
 
         public void Prepare(IAudioSource source, int maxLength)
         {
-            if (source.PCM.ChannelCount != pcm.ChannelCount || source.PCM.BitsPerSample != pcm.BitsPerSample)
+            if (source.PCM.ChannelCount != PCM.ChannelCount || source.PCM.BitsPerSample != PCM.BitsPerSample)
                 throw new Exception("AudioBuffer format mismatch");
-            length = size;
+            Length = Size;
             if (maxLength >= 0)
-                length = Math.Min(length, maxLength);
+                Length = Math.Min(Length, maxLength);
             if (source.Remaining >= 0)
-                length = (int)Math.Min((long)length, source.Remaining);
+                Length = (int)Math.Min((long)Length, source.Remaining);
             dataInBytes = false;
             dataInSamples = false;
             dataInFloat = false;
@@ -347,9 +337,9 @@ namespace CUETools.Codecs
 
         public void Prepare(int maxLength)
         {
-            length = size;
+            Length = Size;
             if (maxLength >= 0)
-                length = Math.Min(length, maxLength);
+                Length = Math.Min(Length, maxLength);
             dataInBytes = false;
             dataInSamples = false;
             dataInFloat = false;
@@ -357,43 +347,43 @@ namespace CUETools.Codecs
 
         public void Prepare(int[,] _samples, int _length)
         {
-            length = _length;
-            size = _samples.GetLength(0);
+            Length = _length;
+            Size = _samples.GetLength(0);
             samples = _samples;
             dataInSamples = true;
             dataInBytes = false;
             dataInFloat = false;
-            if (length > size)
+            if (Length > Size)
                 throw new Exception("Invalid length");
         }
 
         public void Prepare(byte[] _bytes, int _length)
         {
-            length = _length;
-            size = _bytes.Length / PCM.BlockAlign;
+            Length = _length;
+            Size = _bytes.Length / PCM.BlockAlign;
             bytes = _bytes;
             dataInSamples = false;
             dataInBytes = true;
             dataInFloat = false;
-            if (length > size)
+            if (Length > Size)
                 throw new Exception("Invalid length");
         }
 
         internal unsafe void Load(int dstOffset, AudioBuffer src, int srcOffset, int copyLength)
         {
             if (dataInBytes)
-                Buffer.BlockCopy(src.Bytes, srcOffset * pcm.BlockAlign, Bytes, dstOffset * pcm.BlockAlign, copyLength * pcm.BlockAlign);
+                Buffer.BlockCopy(src.Bytes, srcOffset * PCM.BlockAlign, Bytes, dstOffset * PCM.BlockAlign, copyLength * PCM.BlockAlign);
             if (dataInSamples)
-                Buffer.BlockCopy(src.Samples, srcOffset * pcm.ChannelCount * 4, Samples, dstOffset * pcm.ChannelCount * 4, copyLength * pcm.ChannelCount * 4);
+                Buffer.BlockCopy(src.Samples, srcOffset * PCM.ChannelCount * 4, Samples, dstOffset * PCM.ChannelCount * 4, copyLength * PCM.ChannelCount * 4);
             if (dataInFloat)
-                Buffer.BlockCopy(src.Float, srcOffset * pcm.ChannelCount * 4, Float, dstOffset * pcm.ChannelCount * 4, copyLength * pcm.ChannelCount * 4);
+                Buffer.BlockCopy(src.Float, srcOffset * PCM.ChannelCount * 4, Float, dstOffset * PCM.ChannelCount * 4, copyLength * PCM.ChannelCount * 4);
         }
 
         public unsafe void Prepare(AudioBuffer _src, int _offset, int _length)
         {
-            length = Math.Min(size, _src.Length - _offset);
+            Length = Math.Min(Size, _src.Length - _offset);
             if (_length >= 0)
-                length = Math.Min(length, _length);
+                Length = Math.Min(Length, _length);
             dataInBytes = false;
             dataInFloat = false;
             dataInSamples = false;
@@ -403,12 +393,12 @@ namespace CUETools.Codecs
                 dataInSamples = true;
             else if (_src.dataInFloat)
                 dataInFloat = true;
-            Load(0, _src, _offset, length);
+            Load(0, _src, _offset, Length);
         }
 
         public void Swap(AudioBuffer buffer)
         {
-            if (pcm.BitsPerSample != buffer.PCM.BitsPerSample || pcm.ChannelCount != buffer.PCM.ChannelCount)
+            if (PCM.BitsPerSample != buffer.PCM.BitsPerSample || PCM.ChannelCount != buffer.PCM.ChannelCount)
                 throw new Exception("AudioBuffer format mismatch");
 
             int[,] samplesTmp = samples;
@@ -418,8 +408,8 @@ namespace CUETools.Codecs
             fsamples = buffer.fsamples;
             samples = buffer.samples;
             bytes = buffer.bytes;
-            length = buffer.length;
-            size = buffer.size;
+            Length = buffer.Length;
+            Size = buffer.Size;
             dataInSamples = buffer.dataInSamples;
             dataInBytes = buffer.dataInBytes;
             dataInFloat = buffer.dataInFloat;
@@ -427,7 +417,7 @@ namespace CUETools.Codecs
             buffer.samples = samplesTmp;
             buffer.bytes = bytesTmp;
             buffer.fsamples = floatsTmp;
-            buffer.length = 0;
+            buffer.Length = 0;
             buffer.dataInSamples = false;
             buffer.dataInBytes = false;
             buffer.dataInFloat = false;

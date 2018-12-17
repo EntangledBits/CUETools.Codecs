@@ -8,11 +8,9 @@ namespace CUETools.Codecs
     {
         Stream _IO;
         BinaryReader _br;
-        long _dataOffset, _samplePos, _sampleLen;
-        private AudioPCMConfig pcm;
+        long _dataOffset, _samplePos;
         long _dataLen;
         bool _largeFile;
-        string _path;
 
         public long Position
         {
@@ -24,8 +22,8 @@ namespace CUETools.Codecs
             {
                 long seekPos;
 
-                if (_sampleLen >= 0 && value > _sampleLen)
-                    _samplePos = _sampleLen;
+                if (Length >= 0 && value > Length)
+                    _samplePos = Length;
                 else
                     _samplePos = value;
 
@@ -34,57 +32,51 @@ namespace CUETools.Codecs
             }
         }
 
-        public long Length
-        {
-            get
-            {
-                return _sampleLen;
-            }
-        }
+        public long Length { get; private set; }
 
         public long Remaining
         {
             get
             {
-                return _sampleLen - _samplePos;
+                return Length - _samplePos;
             }
         }
 
-        public AudioPCMConfig PCM { get { return pcm; } }
+        public AudioPCMConfig PCM { get; private set; }
 
-        public string Path { get { return _path; } }
+        public string Path { get; }
 
         public WAVReader(string path, Stream IO)
         {
-            _path = path;
-            _IO = IO != null ? IO : new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 0x10000, FileOptions.SequentialScan);
+            Path = path;
+            _IO = IO ?? new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 0x10000, FileOptions.SequentialScan);
             _br = new BinaryReader(_IO);
 
             ParseHeaders();
 
             if (_dataLen < 0)
-                _sampleLen = -1;
+                Length = -1;
             else
-                _sampleLen = _dataLen / pcm.BlockAlign;
+                Length = _dataLen / PCM.BlockAlign;
         }
 
         public WAVReader(string path, Stream IO, AudioPCMConfig _pcm)
         {
-            _path = path;
-            _IO = IO != null ? IO : new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 0x10000, FileOptions.SequentialScan);
+            Path = path;
+            _IO = IO ?? new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 0x10000, FileOptions.SequentialScan);
             _br = new BinaryReader(_IO);
 
             _largeFile = false;
             _dataOffset = 0;
             _samplePos = 0;
-            pcm = _pcm;
+            PCM = _pcm;
             _dataLen = _IO.CanSeek ? _IO.Length : -1;
             if (_dataLen < 0)
-                _sampleLen = -1;
+                Length = -1;
             else
             {
-                _sampleLen = _dataLen / pcm.BlockAlign;
-                if ((_dataLen % pcm.BlockAlign) != 0)
+                Length = _dataLen / PCM.BlockAlign;
+                if ((_dataLen % PCM.BlockAlign) != 0)
                     throw new Exception("odd file size");
             }
         }
@@ -160,7 +152,7 @@ namespace CUETools.Codecs
                     int _bitsPerSample = _br.ReadInt16();
                     pos += 16;
 
-                    if (fmtTag == 0xFFFEU && ckSize >= 34) // WAVE_FORMAT_EXTENSIBLE 
+                    if (fmtTag == 0xFFFEU && ckSize >= 34) // WAVE_FORMAT_EXTENSIBLE
                     {
                         _br.ReadInt16(); // CbSize
                         _br.ReadInt16(); // ValidBitsPerSample
@@ -172,8 +164,8 @@ namespace CUETools.Codecs
                     if (fmtTag != 1) // WAVE_FORMAT_PCM
                         throw new Exception("WAVE format tag not WAVE_FORMAT_PCM.");
 
-                    pcm = new AudioPCMConfig(_bitsPerSample, _channelCount, _sampleRate);
-                    if (pcm.BlockAlign != _blockAlign)
+                    PCM = new AudioPCMConfig(_bitsPerSample, _channelCount, _sampleRate);
+                    if (PCM.BlockAlign != _blockAlign)
                         throw new Exception("WAVE has strange BlockAlign");
                 }
                 else if (ckID == fccData)
@@ -204,13 +196,13 @@ namespace CUETools.Codecs
                 pos = ckEnd;
             } while (true);
 
-            if ((foundFormat & foundData) == false || pcm == null)
+            if ((foundFormat & foundData) == false || PCM == null)
                 throw new Exception("Format or data chunk not found.");
-            if (pcm.ChannelCount <= 0)
+            if (PCM.ChannelCount <= 0)
                 throw new Exception("Channel count is invalid.");
-            if (pcm.SampleRate <= 0)
+            if (PCM.SampleRate <= 0)
                 throw new Exception("Sample rate is invalid.");
-            if ((pcm.BitsPerSample <= 0) || (pcm.BitsPerSample > 32))
+            if ((PCM.BitsPerSample <= 0) || (PCM.BitsPerSample > 32))
                 throw new Exception("Bits per sample is invalid.");
             if (pos != _dataOffset)
                 Position = 0;
@@ -229,11 +221,11 @@ namespace CUETools.Codecs
                 int len = _IO.Read(bytes, pos, byteCount - pos);
                 if (len <= 0)
                 {
-                    if ((pos % PCM.BlockAlign) != 0 || _sampleLen >= 0)
+                    if ((pos % PCM.BlockAlign) != 0 || Length >= 0)
                         throw new Exception("Incomplete file read.");
                     buff.Length = pos / PCM.BlockAlign;
                     _samplePos += buff.Length;
-                    _sampleLen = _samplePos;
+                    Length = _samplePos;
                     return buff.Length;
                 }
                 pos += len;

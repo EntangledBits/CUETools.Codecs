@@ -6,17 +6,12 @@ namespace CUETools.Codecs
     {
         private uint bit_buf;
         private int bit_left;
-        private byte[] buffer;
-        private int buf_start, buf_ptr, buf_end;
+        private readonly int buf_start;
+        private int buf_ptr;
+        private readonly int buf_end;
         private bool eof;
 
-        public byte[] Buffer
-        {
-            get
-            {
-                return buffer;
-            }
-        }
+        public byte[] Buffer { get; }
 
         public int Length
         {
@@ -26,7 +21,7 @@ namespace CUETools.Codecs
             }
             set
             {
-                flush();
+                Flush();
                 buf_ptr = buf_start + value;
             }
         }
@@ -41,7 +36,7 @@ namespace CUETools.Codecs
 
         public BitWriter(byte[] buf, int pos, int len)
         {
-            buffer = buf;
+            Buffer = buf;
             buf_start = pos;
             buf_ptr = pos;
             buf_end = pos + len;
@@ -58,76 +53,76 @@ namespace CUETools.Codecs
             eof = false;
         }
 
-        public void writebytes(int bytes, byte c)
+        public void Writebytes(int bytes, byte c)
         {
             for (; bytes > 0; bytes--)
             {
-                writebits(8, c);
+                Writebits(8, c);
             }
         }
 
-        public unsafe void writeints(int len, int pos, byte* buf)
+        public unsafe void Writeints(int len, int pos, byte* buf)
         {
             int old_pos = BitLength;
             int start = old_pos / 8;
             int start1 = pos / 8;
             int end = (old_pos + len) / 8;
             int end1 = (pos + len) / 8;
-            flush();
-            byte start_val = old_pos % 8 != 0 ? buffer[start] : (byte)0;
-            fixed (byte* buf1 = &buffer[0])
+            Flush();
+            byte start_val = old_pos % 8 != 0 ? Buffer[start] : (byte)0;
+            fixed (byte* buf1 = &Buffer[0])
                 AudioSamples.MemCpy(buf1 + start, buf + start1, end - start);
-            buffer[start] |= start_val;
+            Buffer[start] |= start_val;
             buf_ptr = end;
             if ((old_pos + len) % 8 != 0)
-                writebits((old_pos + len) % 8, buf[end1] >> (8 - ((old_pos + len) % 8)));
+                Writebits((old_pos + len) % 8, buf[end1] >> (8 - ((old_pos + len) % 8)));
         }
 
-        public void write(params char[] chars)
+        public void Write(params char[] chars)
         {
             foreach (char c in chars)
-                writebits(8, (byte)c);
+                Writebits(8, (byte)c);
         }
 
-        public void write(string s)
+        public void Write(string s)
         {
             for (int i = 0; i < s.Length; i++)
-                writebits(8, (byte)s[i]);
+                Writebits(8, (byte)s[i]);
         }
 
-        public void writebits_signed(int bits, int val)
+        public void Writebits_signed(int bits, int val)
         {
-            writebits(bits, val & ((1 << bits) - 1));
+            Writebits(bits, val & ((1 << bits) - 1));
         }
 
-        public void writebits_signed(uint bits, int val)
+        public void Writebits_signed(uint bits, int val)
         {
-            writebits((int)bits, val & ((1 << (int)bits) - 1));
+            Writebits((int)bits, val & ((1 << (int)bits) - 1));
         }
 
-        public void writebits(int bits, int val)
+        public void Writebits(int bits, int val)
         {
-            writebits(bits, (uint)val);
+            Writebits(bits, (uint)val);
         }
 
-        public void writebits(DateTime val)
+        public void Writebits(DateTime val)
         {
             TimeSpan span = val.ToUniversalTime() - new DateTime(1904, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
-            writebits(32, (uint)span.TotalSeconds);
+            Writebits(32, (uint)span.TotalSeconds);
         }
 
-        public void writebits64(int bits, ulong val)
+        public void Writebits64(int bits, ulong val)
         {
             if (bits > 32)
             {
-                writebits(bits - 32, (uint)(val >> 32));
+                Writebits(bits - 32, (uint)(val >> 32));
                 val &= 0xffffffffL;
                 bits = 32;
             }
-            writebits(bits, (uint)val);
+            Writebits(bits, (uint)val);
         }
 
-        public void writebits(int bits, uint val)
+        public void Writebits(int bits, uint val)
         {
             //assert(bits == 32 || val < (1U << bits));
 
@@ -155,12 +150,12 @@ namespace CUETools.Codecs
                     bb = (bit_buf << bit_left) | (val >> (bits - bit_left));
                     bit_left += (32 - bits);
                 }
-                if (buffer != null)
+                if (Buffer != null)
                 {
-                    buffer[buf_ptr + 3] = (byte)(bb & 0xFF); bb >>= 8;
-                    buffer[buf_ptr + 2] = (byte)(bb & 0xFF); bb >>= 8;
-                    buffer[buf_ptr + 1] = (byte)(bb & 0xFF); bb >>= 8;
-                    buffer[buf_ptr + 0] = (byte)(bb & 0xFF);
+                    Buffer[buf_ptr + 3] = (byte)(bb & 0xFF); bb >>= 8;
+                    Buffer[buf_ptr + 2] = (byte)(bb & 0xFF); bb >>= 8;
+                    Buffer[buf_ptr + 1] = (byte)(bb & 0xFF); bb >>= 8;
+                    Buffer[buf_ptr + 0] = (byte)(bb & 0xFF);
                 }
                 buf_ptr += 4;
                 bit_buf = val;
@@ -200,29 +195,29 @@ namespace CUETools.Codecs
 //            }
 //        }
 
-        public void write_utf8(int val)
+        public void Write_utf8(int val)
         {
-            write_utf8((uint)val);
+            Write_utf8((uint)val);
         }
 
-        public void write_utf8(uint val)
+        public void Write_utf8(uint val)
         {
             if (val < 0x80)
             {
-                writebits(8, val);
+                Writebits(8, val);
                 return;
             }
-            int bytes = (BitReader.log2i(val) + 4) / 5;
+            int bytes = (BitReader.Log2i(val) + 4) / 5;
             int shift = (bytes - 1) * 6;
-            writebits(8, (256U - (256U >> bytes)) | (val >> shift));
+            Writebits(8, (256U - (256U >> bytes)) | (val >> shift));
             while (shift >= 6)
             {
                 shift -= 6;
-                writebits(8, 0x80 | ((val >> shift) & 0x3F));
+                Writebits(8, 0x80 | ((val >> shift) & 0x3F));
             }
         }
 
-        public void write_unary_signed(int val)
+        public void Write_unary_signed(int val)
         {
             // convert signed to unsigned
             int v = -2 * val - 1;
@@ -232,13 +227,13 @@ namespace CUETools.Codecs
             int q = v + 1;
             while (q > 31)
             {
-                writebits(31, 0);
+                Writebits(31, 0);
                 q -= 31;
             }
-            writebits(q, 1);
+            Writebits(q, 1);
         }
 
-        public void write_rice_signed(int k, int val)
+        public void Write_rice_signed(int k, int val)
         {
             // convert signed to unsigned
             int v = -2 * val - 1;
@@ -249,15 +244,15 @@ namespace CUETools.Codecs
             while (q + k > 31)
             {
                 int b = Math.Min(q + k - 31, 31);
-                writebits(b, 0);
+                Writebits(b, 0);
                 q -= b;
             }
 
             // write remainder in binary using 'k' bits
-            writebits(k + q, (v & ((1 << k) - 1)) | (1 << k));
+            Writebits(k + q, (v & ((1 << k) - 1)) | (1 << k));
         }
 
-        public unsafe void write_rice_block_signed(byte* fixedbuf, int k, int* residual, int count)
+        public unsafe void Write_rice_block_signed(byte* fixedbuf, int k, int* residual, int count)
         {
             byte* buf = &fixedbuf[buf_ptr];
             //fixed (byte* fixbuf = &buffer[buf_ptr])
@@ -330,7 +325,7 @@ namespace CUETools.Codecs
             }
         }
 
-        public void flush()
+        public void Flush()
         {
             bit_buf <<= bit_left;
             while (bit_left < 32 && !eof)
@@ -340,8 +335,8 @@ namespace CUETools.Codecs
                     eof = true;
                     break;
                 }
-                if (buffer != null)
-                    buffer[buf_ptr] = (byte)(bit_buf >> 24);
+                if (Buffer != null)
+                    Buffer[buf_ptr] = (byte)(bit_buf >> 24);
                 buf_ptr++;
                 bit_buf <<= 8;
                 bit_left += 8;

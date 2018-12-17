@@ -6,7 +6,8 @@ namespace CUETools.Codecs
 {
     public class UserDefinedReader : IAudioSource
     {
-        string _path, _decoder, _decoderParams;
+        private readonly string _decoder;
+        private string _decoderParams;
         Process _decoderProcess;
         WAVReader rdr;
 
@@ -51,11 +52,11 @@ namespace CUETools.Codecs
             }
         }
 
-        public string Path { get { return _path; } }
+        public string Path { get; }
 
         public UserDefinedReader(string path, Stream IO, string decoder, string decoderParams)
         {
-            _path = path;
+            Path = path;
             _decoder = decoder;
             _decoderParams = decoderParams;
             _decoderProcess = null;
@@ -68,7 +69,7 @@ namespace CUETools.Codecs
                 return;
             _decoderProcess = new Process();
             _decoderProcess.StartInfo.FileName = _decoder;
-            _decoderProcess.StartInfo.Arguments = _decoderParams.Replace("%I", "\"" + _path + "\"");
+            _decoderProcess.StartInfo.Arguments = _decoderParams.Replace("%I", "\"" + Path + "\"");
             _decoderProcess.StartInfo.CreateNoWindow = true;
             _decoderProcess.StartInfo.RedirectStandardOutput = true;
             _decoderProcess.StartInfo.UseShellExecute = false;
@@ -86,7 +87,7 @@ namespace CUETools.Codecs
             }
             if (!started)
                 throw new Exception(_decoder + ": " + (ex == null ? "please check the path" : ex.Message));
-            rdr = new WAVReader(_path, _decoderProcess.StandardOutput.BaseStream);
+            rdr = new WAVReader(Path, _decoderProcess.StandardOutput.BaseStream);
         }
 
         public void Close()

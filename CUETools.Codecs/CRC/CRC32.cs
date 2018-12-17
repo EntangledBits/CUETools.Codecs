@@ -142,8 +142,8 @@ namespace CUETools.Codecs
 
 				for (int i = 1; i < GF2_DIM; i++)
 				{
-					gf2_matrix_square(ct + i * 32, ct + (i - 1) * 32);
-					gf2_matrix_square(st + i * 32, st + (i - 1) * 32);
+					Gf2_matrix_square(ct + i * 32, ct + (i - 1) * 32);
+					Gf2_matrix_square(st + i * 32, st + (i - 1) * 32);
 				}
 			}
 		}
@@ -151,7 +151,7 @@ namespace CUETools.Codecs
 		const int GF2_DIM = 32;
 		//const int GF2_DIM2 = 67;
 
-		private static unsafe uint gf2_matrix_times(uint* mat, uint vec)
+		private static unsafe uint Gf2_matrix_times(uint* mat, uint vec)
 		{
 			return *(mat++) * (vec & 1) ^
 			*(mat++) * ((vec >>= 1) & 1) ^
@@ -188,10 +188,10 @@ namespace CUETools.Codecs
 		}
 
 		/* ========================================================================= */
-		private static unsafe void gf2_matrix_square(uint *square, uint *mat)
+		private static unsafe void Gf2_matrix_square(uint *square, uint *mat)
 		{
 			for (int n = 0; n < GF2_DIM; n++)
-				square[n] = gf2_matrix_times(mat, mat[n]);
+				square[n] = Gf2_matrix_times(mat, mat[n]);
 		}
 
 		public static unsafe uint Combine(uint crc1, uint crc2, long len2)
@@ -211,7 +211,7 @@ namespace CUETools.Codecs
 				{
 					/* apply zeros operator for this bit of len2 */
 					if ((len2 & 1) != 0)
-						crc1 = gf2_matrix_times(ct + 32 * n, crc1);
+						crc1 = Gf2_matrix_times(ct + 32 * n, crc1);
 					len2 >>= 1;
 					n = (n + 1) & (GF2_DIM - 1);
 					/* if no more bits set, then done */
@@ -240,7 +240,7 @@ namespace CUETools.Codecs
 				{
 					/* apply zeros operator for this bit of len2 */
 					if ((len2 & 1) != 0)
-						crc1 = gf2_matrix_times(st + 32 * n, crc1);
+						crc1 = Gf2_matrix_times(st + 32 * n, crc1);
 					len2 >>= 1;
 					n = (n + 1) & (GF2_DIM - 1);
 					/* if no more bits set, then done */

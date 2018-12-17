@@ -21,55 +21,29 @@ namespace CUETools.Codecs
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
     public sealed class AudioEncoderClass : Attribute
     {
-        private string _encoderName, _extension, _supportedModes, _defaultMode;
-        private bool _lossless;
-        private int _priority;
-        private Type _settings;
+        public string EncoderName { get; }
 
-        public string EncoderName
-        {
-            get { return _encoderName; }
-        }
+        public string Extension { get; }
 
-        public string Extension
-        {
-            get { return _extension; }
-        }
+        public string SupportedModes { get; }
 
-        public string SupportedModes
-        {
-            get { return _supportedModes; }
-        }
+        public string DefaultMode { get; }
 
-        public string DefaultMode
-        {
-            get { return _defaultMode; }
-        }
+        public bool Lossless { get; }
 
-        public bool Lossless
-        {
-            get { return _lossless; }
-        }
+        public int Priority { get; }
 
-        public int Priority
-        {
-            get { return _priority; }
-        }
-
-        public Type Settings
-        {
-            get { return _settings; }
-        }
+        public Type Settings { get; }
 
         public AudioEncoderClass(string encoderName, string extension, bool lossless, string supportedModes, string defaultMode, int priority, Type settings)
         {
-            _encoderName = encoderName;
-            _extension = extension;
-            _supportedModes = supportedModes;
-            _defaultMode = defaultMode;
-            _lossless = lossless;
-            _priority = priority;
-            _settings = settings;
+            EncoderName = encoderName;
+            Extension = extension;
+            SupportedModes = supportedModes;
+            DefaultMode = defaultMode;
+            Lossless = lossless;
+            Priority = priority;
+            Settings = settings;
         }
     }
 }

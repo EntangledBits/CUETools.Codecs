@@ -19,7 +19,7 @@ namespace CUETools.Codecs
 
         /// <summary>
         /// Pause Playback
-        /// </summary>        
+        /// </summary>
         void Pause();
 
         /// <summary>
@@ -33,7 +33,7 @@ namespace CUETools.Codecs
         float Volume { get; set; }
 
         /// <summary>
-        /// Indicates that playback has gone into a stopped state due to 
+        /// Indicates that playback has gone into a stopped state due to
         /// reaching the end of the input stream
         /// </summary>
         event EventHandler PlaybackStopped;

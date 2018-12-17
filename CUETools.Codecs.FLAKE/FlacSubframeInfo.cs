@@ -7,8 +7,8 @@ namespace CUETools.Codecs.FLAKE
         public FlacSubframeInfo()
         {
             best = new FlacSubframe();
-            lpc_ctx = new LpcContext[lpc.MAX_LPC_WINDOWS];
-            for (int i = 0; i < lpc.MAX_LPC_WINDOWS; i++)
+            lpc_ctx = new LpcContext[Lpc.MAX_LPC_WINDOWS];
+            for (int i = 0; i < Lpc.MAX_LPC_WINDOWS; i++)
                 lpc_ctx[i] = new LpcContext();
         }
 
@@ -22,7 +22,7 @@ namespace CUETools.Codecs.FLAKE
             best.residual = r;
             best.type = SubframeType.Verbatim;
             best.size = AudioSamples.UINT32_MAX;
-            for (int iWindow = 0; iWindow < lpc.MAX_LPC_WINDOWS; iWindow++)
+            for (int iWindow = 0; iWindow < Lpc.MAX_LPC_WINDOWS; iWindow++)
                 lpc_ctx[iWindow].Reset();
             done_fixed = 0;
         }

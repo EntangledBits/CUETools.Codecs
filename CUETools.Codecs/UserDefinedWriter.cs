@@ -6,12 +6,14 @@ namespace CUETools.Codecs
 {
     public class UserDefinedWriter : IAudioDest
     {
-        string _path, _encoder, _encoderParams, _encoderMode;
+        private readonly string _encoder;
+        private string _encoderParams;
+        private readonly string _encoderMode;
         Process _encoderProcess;
         WAVWriter wrt;
         CyclicBuffer outputBuffer = null;
-        bool useTempFile = false;
-        string tempFile = null;
+        readonly bool useTempFile = false;
+        readonly string tempFile = null;
         long _finalSampleCount = -1;
         bool closed = false;
 
@@ -62,11 +64,11 @@ namespace CUETools.Codecs
             get { return wrt.PCM; }
         }
 
-        public string Path { get { return _path; } }
+        public string Path { get; }
 
         public UserDefinedWriter(string path, Stream IO, AudioPCMConfig pcm, string encoder, string encoderParams, string encoderMode, int padding)
         {
-            _path = path;
+            Path = path;
             _encoder = encoder;
             _encoderParams = encoderParams;
             _encoderMode = encoderMode;
@@ -147,7 +149,7 @@ namespace CUETools.Codecs
         public void Delete()
         {
             Close();
-            File.Delete(_path);
+            File.Delete(Path);
         }
 
         public void Write(AudioBuffer buff)

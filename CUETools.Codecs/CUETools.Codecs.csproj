@@ -2,9 +2,22 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <PackageProjectUrl>https://github.com/EntangledBits/CUETools.Codecs</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/EntangledBits/CUETools.Codecs</RepositoryUrl>
+    <RepositoryType>GIT</RepositoryType>
+    <Company>Entangled Bits</Company>
+    <Authors>Entangled Bits</Authors>
+    <Description>.net Standard port of CUETools.Codecs Original code from Gregory S. Chudov</Description>
+    <PackageLicenseUrl>https://www.gnu.org/licenses/lgpl-3.0-standalone.html</PackageLicenseUrl>
+    <PackageTags>Encoding WAV PCM</PackageTags>
+    <Version>1.0.1</Version>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
