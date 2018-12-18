@@ -12,10 +12,6 @@ private void ConvertToFlac(Stream sourceStream, Stream destinationStream)
             var audioSource = new WAVReader(null, sourceStream);
             try
             {
-                if (audioSource.PCM.SampleRate != 16000)
-                {
-                    throw new InvalidOperationException("Incorrect frequency - WAV file must be at 16 KHz.");
-                }
                 var buff = new AudioBuffer(audioSource, 0x10000);
                 var flakeWriter = new FlakeWriter(null, destinationStream, audioSource.PCM);
                 flakeWriter.CompressionLevel = 8;
