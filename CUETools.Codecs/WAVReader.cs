@@ -4,7 +4,7 @@ using System.IO;
 namespace CUETools.Codecs
 {
     [AudioDecoderClass("builtin wav", "wav")]
-    public class WAVReader : IAudioSource
+    public class WAVReader : IAudioSource, IDisposable
     {
         Stream _IO;
         BinaryReader _br;
@@ -232,6 +232,11 @@ namespace CUETools.Codecs
             }
             _samplePos += buff.Length;
             return buff.Length;
+        }
+
+        public void Dispose()
+        {
+            Close();
         }
     }
 }

@@ -4,7 +4,7 @@ using System.IO;
 namespace CUETools.Codecs.FLAKE
 {
     [AudioDecoderClass("libFlake", "flac")]
-	public class FlakeReader: IAudioSource
+	public class FlakeReader: IAudioSource, IDisposable
 	{
         readonly int[] residualBuffer;
 
@@ -695,5 +695,10 @@ namespace CUETools.Codecs.FLAKE
 			} while (true);
 			first_frame_offset = _IO.Position - _framesBufferLength;
 		}
-	}
+
+        public void Dispose()
+        {
+            Close();
+        }
+    }
 }

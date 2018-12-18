@@ -21,22 +21,14 @@ namespace CUETools.Codecs
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
     public sealed class AudioDecoderClass : Attribute
     {
-        private string _decoderName, _extension;
+        public string DecoderName { get; }
 
-        public string DecoderName
-        {
-            get { return _decoderName; }
-        }
-
-        public string Extension
-        {
-            get { return _extension; }
-        }
+        public string Extension { get; }
 
         public AudioDecoderClass(string decoderName, string extension)
         {
-            _decoderName = decoderName;
-            _extension = extension;
+            DecoderName = decoderName;
+            Extension = extension;
         }
     }
 }

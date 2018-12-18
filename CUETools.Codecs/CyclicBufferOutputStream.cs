@@ -3,7 +3,7 @@ using System.IO;
 
 namespace CUETools.Codecs
 {
-    public class CyclicBufferOutputStream : Stream
+    public class CyclicBufferOutputStream : Stream, IDisposable
     {
         private CyclicBuffer _buffer;
 
@@ -75,6 +75,11 @@ namespace CUETools.Codecs
         public override void Write(byte[] array, int offset, int count)
         {
             _buffer.Read(array, offset, count);
+        }
+
+        public new void Dispose()
+        {
+            _buffer.Close();
         }
     }
 }

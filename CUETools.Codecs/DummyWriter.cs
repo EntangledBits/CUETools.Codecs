@@ -4,11 +4,9 @@ namespace CUETools.Codecs
 {
     public class DummyWriter : IAudioDest
     {
-        AudioPCMConfig _pcm;
-
         public DummyWriter(string path, AudioPCMConfig pcm)
         {
-            _pcm = pcm;
+            PCM = pcm;
         }
 
         public void Close()
@@ -53,10 +51,7 @@ namespace CUETools.Codecs
             set { }
         }
 
-        public AudioPCMConfig PCM
-        {
-            get { return _pcm; }
-        }
+        public AudioPCMConfig PCM { get; }
 
         public void Write(AudioBuffer buff)
         {

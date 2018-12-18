@@ -4,7 +4,7 @@ using System.Threading;
 
 namespace CUETools.Codecs
 {
-    public class CyclicBuffer
+    public class CyclicBuffer : IDisposable
     {
         private readonly byte[] _buffer;
         private readonly int _size;
@@ -223,6 +223,11 @@ namespace CUETools.Codecs
                 }
             }
             CloseOutputEvent?.Invoke(to);
+        }
+
+        public void Dispose()
+        {
+            Close();
         }
 
         public delegate void FlushOutput(byte[] buffer, int pos, int chunk, object to);

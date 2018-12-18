@@ -5,7 +5,7 @@ using System.IO;
 namespace CUETools.Codecs
 {
     [AudioEncoderClass("builtin wav", "wav", true, "", "", 10, typeof(object))]
-    public class WAVWriter : IAudioDest
+    public class WAVWriter : IAudioDest, IDisposable
     {
         private Stream _IO;
         private BinaryWriter _bw;
@@ -194,6 +194,11 @@ namespace CUETools.Codecs
                 WriteHeaders();
             _IO.Write(buff.Bytes, 0, buff.ByteLength);
             Position += buff.Length;
+        }
+
+        public void Dispose()
+        {
+            Close();
         }
     }
 }

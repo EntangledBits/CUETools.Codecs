@@ -1,13 +1,8 @@
-#define NOINTEROP
-
 using System;
 using System.ComponentModel;
 using System.Text;
 using System.IO;
 using System.Security.Cryptography;
-#if INTEROP
-using System.Runtime.InteropServices;
-#endif
 
 namespace CUETools.Codecs.FLAKE
 {
@@ -16,24 +11,23 @@ namespace CUETools.Codecs.FLAKE
 		public FlakeWriterSettings() { DoVerify = false; DoMD5 = true; }
 		[DefaultValue(false)]
 		[DisplayName("Verify")]
-		[SRDescription(typeof(Resource), "DoVerifyDescription")]
+		[SRDescription(typeof(Properties.Resources), "DoVerifyDescription")]
 		public bool DoVerify { get; set; }
 
 		[DefaultValue(true)]
 		[DisplayName("MD5")]
-		[SRDescription(typeof(Resource), "DoMD5Description")]
+		[SRDescription(typeof(Properties.Resources), "DoMD5Description")]
 		public bool DoMD5 { get; set; }
 	}
 
 	[AudioEncoderClass("libFlake", "flac", true, "0 1 2 3 4 5 6 7 8 9 10 11", "7", 4, typeof(FlakeWriterSettings))]
 	//[AudioEncoderClass("libFlake nonsub", "flac", true, "9 10 11", "9", 3, typeof(FlakeWriterSettings))]
-	public class FlakeWriter : IAudioDest
+	public class FlakeWriter : IAudioDest, IDisposable
 	{
 		Stream _IO = null;
         private readonly int channels;
         private int ch_code;
         private int sr_code0;
-        private readonly int sr_code1;
 
         // sample size in bits
         // set by use"audio/x-flac; rate=16000" prior to calling flake_encode_init
@@ -160,13 +154,6 @@ namespace CUETools.Codecs.FLAKE
 			}
 		}
 
-#if INTEROP
-		[DllImport("kernel32.dll")]
-		static extern bool GetThreadTimes(IntPtr hThread, out long lpCreationTime, out long lpExitTime, out long lpKernelTime, out long lpUserTime);
-		[DllImport("kernel32.dll")]
-		static extern IntPtr GetCurrentThread();
-#endif
-
 		void DoClose()
 		{
 			if (inited)
@@ -205,19 +192,13 @@ namespace CUETools.Codecs.FLAKE
 				_IO.Close();
 				inited = false;
 			}
-
-#if INTEROP
-			long fake, KernelStart, UserStart;
-			GetThreadTimes(GetCurrentThread(), out fake, out fake, out KernelStart, out UserStart);
-			_userProcessorTime = new TimeSpan(UserStart);
-#endif
 		}
 
 		public void Close()
 		{
 			DoClose();
 			if (sample_count > 0 && Position != sample_count)
-				throw new Exception(Resource.ExceptionSampleCount);
+				throw new Exception(Properties.Resources.ExceptionSampleCount);
 		}
 
 		public void Delete()
@@ -437,11 +418,7 @@ namespace CUETools.Codecs.FLAKE
 		{
 			get
 			{
-#if INTEROP
-				return _userProcessorTime;
-#else
 				return new TimeSpan(0);
-#endif
 			}
 		}
 
@@ -989,15 +966,6 @@ namespace CUETools.Codecs.FLAKE
 					bitwriter.Writebits(16, frame.bs_code1);
 			}
 
-			// custom sample rate
-			if (sr_code1 > 0)
-			{
-				if (sr_code1 < 256)
-					bitwriter.Writebits(8, sr_code1);
-				else
-					bitwriter.Writebits(16, sr_code1);
-			}
-
 			// CRC-8 of frame header
 			bitwriter.Flush();
 			byte crc = crc8.ComputeChecksum(frame_buffer, 0, bitwriter.Length);
@@ -1441,12 +1409,12 @@ namespace CUETools.Codecs.FLAKE
 			{
 				int decoded = verify.DecodeFrame(frame_buffer, 0, fs);
 				if (decoded != fs || verify.Remaining != bs)
-					throw new Exception(Resource.ExceptionValidationFailed);
+					throw new Exception(Properties.Resources.ExceptionValidationFailed);
 				fixed (int* s = verifyBuffer, r = verify.Samples)
 				{
 					for (int ch = 0; ch < channels; ch++)
 						if (AudioSamples.MemCmp(s + ch * Flake.MAX_BLOCKSIZE, r + ch * Flake.MAX_BLOCKSIZE, bs))
-							throw new Exception(Resource.ExceptionValidationFailed);
+							throw new Exception(Properties.Resources.ExceptionValidationFailed);
 				}
 			}
 
@@ -1719,11 +1687,13 @@ namespace CUETools.Codecs.FLAKE
 			header = new byte[eparams.padding_size + 1024 + (seek_table == null ? 0 : seek_table.Length * 18)];
 			header_len = Write_headers();
 
-			// initialize CRC & MD5
-			if (_IO.CanSeek && _settings.DoMD5)
+            // initialize CRC & MD5
+#pragma warning disable SCS0006
+            if (_IO.CanSeek && _settings.DoMD5)
 				md5 = new MD5CryptoServiceProvider();
+#pragma warning restore SCS0006
 
-			if (_settings.DoVerify)
+            if (_settings.DoVerify)
 			{
 				verify = new FlakeReader(PCM);
 				verifyBuffer = new int[Flake.MAX_BLOCKSIZE * channels];
@@ -1733,7 +1703,12 @@ namespace CUETools.Codecs.FLAKE
 
 			return header_len;
 		}
-	}
+
+        public void Dispose()
+        {
+            Close();
+        }
+    }
 
 	struct FlakeEncodeParams
 	{
