@@ -162,7 +162,7 @@ namespace CUETools.Codecs.FLAKE
 					{
 						int* psrc = src;
 						for (int i = 0; i < count; i++)
-							res[i + i] = *(psrc++);
+							res[i] = *(psrc++);
 					}
 			}
 		}
