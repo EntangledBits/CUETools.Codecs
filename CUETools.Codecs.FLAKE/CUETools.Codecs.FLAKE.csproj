@@ -10,8 +10,8 @@
     <Description>.net Standard port of CUETools.Codecs.FLAKE Original code from Gregory S. Chudov and Justin Ruggles</Description>
     <PackageLicenseUrl>https://www.gnu.org/licenses/lgpl-3.0-standalone.html</PackageLicenseUrl>
     <PackageTags>Encoding FLAC WAV PCM FLAKE</PackageTags>
-    <Version>1.0.2</Version>
-    <PackageReleaseNotes>Added IDisposable to FlakeReader and FlakeWriter</PackageReleaseNotes>
+    <Version>1.0.3</Version>
+    <PackageReleaseNotes>removed reader requirments for a flac file</PackageReleaseNotes>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

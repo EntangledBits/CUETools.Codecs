@@ -56,8 +56,8 @@ namespace CUETools.Codecs.FLAKE
 			}
 			_samplesInBuffer = 0;
 
-			if ((PCM.BitsPerSample != 16 && PCM.BitsPerSample != 24) || PCM.ChannelCount != 2 || (PCM.SampleRate != 44100 && PCM.SampleRate != 48000))
-				throw new Exception("invalid flac file");
+			//if ((PCM.BitsPerSample != 16 && PCM.BitsPerSample != 24) || PCM.ChannelCount != 2 || (PCM.SampleRate != 44100 && PCM.SampleRate != 48000))
+			//	throw new Exception("invalid flac file");
 
 			Samples = new int[Flake.MAX_BLOCKSIZE * PCM.ChannelCount];
 			residualBuffer = new int[Flake.MAX_BLOCKSIZE * PCM.ChannelCount];
