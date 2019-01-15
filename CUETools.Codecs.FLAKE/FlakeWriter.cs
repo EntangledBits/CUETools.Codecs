@@ -158,41 +158,46 @@ namespace CUETools.Codecs.FLAKE
 		{
 			if (inited)
 			{
-				while (samplesInBuffer > 0)
-				{
-					eparams.block_size = samplesInBuffer;
-					Output_frame();
-				}
-
-				if (_IO.CanSeek)
-				{
-					if (sample_count <= 0 && Position != 0)
-					{
-						BitWriter bitwriter = new BitWriter(header, 0, 4);
-						bitwriter.Writebits(32, (int)Position);
-						bitwriter.Flush();
-						_IO.Position = 22;
-						_IO.Write(header, 0, 4);
-					}
-
-					if (md5 != null)
-					{
-						md5.TransformFinalBlock(frame_buffer, 0, 0);
-						_IO.Position = 26;
-						_IO.Write(md5.Hash, 0, md5.Hash.Length);
-					}
-
-					if (seek_table != null)
-					{
-						_IO.Position = seek_table_offset;
-						int len = Write_seekpoints(header, 0, 0);
-						_IO.Write(header, 4, len - 4);
-					}
-				}
+				WriteHeader();
 				_IO.Close();
 				inited = false;
 			}
 		}
+		
+		public void WriteHeader()
+	       {
+		   while (samplesInBuffer > 0)
+		   {
+		       eparams.block_size = samplesInBuffer;
+		       Output_frame();
+		   }
+
+		   if (_IO.CanSeek)
+		   {
+		       if (sample_count <= 0 && Position != 0)
+		       {
+			   BitWriter bitwriter = new BitWriter(header, 0, 4);
+			   bitwriter.Writebits(32, (int)Position);
+			   bitwriter.Flush();
+			   _IO.Position = 22;
+			   _IO.Write(header, 0, 4);
+		       }
+
+		       if (md5 != null)
+		       {
+			   md5.TransformFinalBlock(frame_buffer, 0, 0);
+			   _IO.Position = 26;
+			   _IO.Write(md5.Hash, 0, md5.Hash.Length);
+		       }
+
+		       if (seek_table != null)
+		       {
+			   _IO.Position = seek_table_offset;
+			   int len = Write_seekpoints(header, 0, 0);
+			   _IO.Write(header, 4, len - 4);
+		       }
+		   }
+	       }
 
 		public void Close()
 		{
